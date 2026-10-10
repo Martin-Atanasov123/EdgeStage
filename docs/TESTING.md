@@ -24,18 +24,18 @@ check that needs a real keyboard or mouse is marked PARTIAL or NOT RUN, and list
 (`EDGESTAGE_TEST_ONLY_PROCESS`) limited the sidebar to synthetic test windows. Checks against the
 user's real windows recorded aggregate pixel statistics only.
 
-## 1. Automated tests — 179 PASS, 1 inconclusive
+## 1. Automated tests — 200 PASS, 1 inconclusive (201 total)
 
 ```bash
 dotnet test EdgeStage.slnx -c Release
 ```
 
-Result (Debug and Release, repeated runs): **177 passed, 0 failed, 0 skipped.**
+Result (Debug and Release): **200 passed, 0 failed, 1 skipped/inconclusive** (the activation test whose final step needs foreground rights that Windows does not give a non-interactive runner).
 
 | Group | Tests | What they cover |
 |---|---|---|
-| Unit (150) | WindowFilter 16 · MruOrder 7 · Hotkey 6 (+data rows) · EdgeTriggerStateMachine 12 · MonitorLayout 10 · SidebarPlacement 8 · ThumbnailGeometry 10 · SettingsStore 10 · StartupRegistration 8 · SidebarViewModel 12 · Fullscreen/Log 7 · ICO + native struct layout 5 · smoke 1 | Alt+Tab filtering rules (never titles), MRU ordering and the "switch back" pre-selection, hotkey parsing/formatting, edge dwell/re-arm/button-held/full-screen rules, outer-edge zones with negative coordinates and monitor seams, placement and keep-open region at 100–200 % DPI, aspect-fit and scroll clipping, settings defaults/clamping/corruption/forward compatibility/atomic save, Start-with-Windows states incl. Task Manager "disabled", card list behaviour, icon sizes, NOTIFYICONDATAW = 976 bytes |
-| Desktop integration (27) | `TestCategory=Desktop` | Real windows created by the test process: enumeration excludes tool windows/owned dialogs/own process, minimized state; DWM register/apply/release, dead source detected, 300 registrations leave no live handles; hotkey conflict (Win32 error 1409) and release; **activation restores a minimized window and brings it to the foreground**; window gone; WinEvent show/title/destroy and stop-after-end; monitor layout; icon extraction; edge polling stops when disabled/paused; tray menu built for real and every item clicked (programmatically) against a fake host; settings window: load, toggles, debounced sliders, conflict suggestion, recorder suspends/resumes the global hotkey; Start with Windows against the real registry in a scratch key |
+| Unit (169) | WindowFilter 16 · MruOrder 7 · Hotkey 6 (+data rows) · EdgeTriggerStateMachine 12 · MonitorLayout 10 · SidebarPlacement 8 · ThumbnailGeometry 10 · SettingsStore 10 · StartupRegistration 8 · SidebarViewModel 12 · Fullscreen/Log 7 · ICO + native struct layout 5 · smoke 1 | Alt+Tab filtering rules (never titles), MRU ordering and the "switch back" pre-selection, hotkey parsing/formatting, edge dwell/re-arm/button-held/full-screen rules, outer-edge zones with negative coordinates and monitor seams, placement and keep-open region at 100–200 % DPI, aspect-fit and scroll clipping, settings defaults/clamping/corruption/forward compatibility/atomic save, Start-with-Windows states incl. Task Manager "disabled", card list behaviour, icon sizes, NOTIFYICONDATAW = 976 bytes |
+| Desktop integration (32) | `TestCategory=Desktop` | Real windows created by the test process: enumeration excludes tool windows/owned dialogs/own process, minimized state; DWM register/apply/release, dead source detected, 300 registrations leave no live handles; hotkey conflict (Win32 error 1409) and release; **activation restores a minimized window and brings it to the foreground**; window gone; WinEvent show/title/destroy and stop-after-end; monitor layout; icon extraction; edge polling stops when disabled/paused; tray menu built for real and every item clicked (programmatically) against a fake host; settings window: load, toggles, debounced sliders, conflict suggestion, recorder suspends/resumes the global hotkey; Start with Windows against the real registry in a scratch key |
 
 ## 2. Phase 1 spike — DWM thumbnails (PASS)
 
@@ -71,6 +71,11 @@ use DEBUG-only hooks to open the sidebar and to trigger "activate selected card"
 | Settings window, conflict notice, tray menu rendering | PASS | screenshots in `docs/images/` (tray menu opened by a DEBUG hook at a fixed position) |
 | Zoom transition runs to completion, hides itself, releases its thumbnail | PASS | integration test `ZoomOverlayTests` (≥250 ms; 20 frames / 286 ms grow and 9 frames / 123 ms fade measured in the app) |
 | Zoom ends with the target window in front | NOT RUN | in the scripted runs Windows refused foreground activation (the user was working in another app, no real input); the refusal path (tray notice, overlay still hides) was exercised |
+| Hidden apps: normalization, case-insensitive match, cap/dedupe, JSON round-trip, old settings files | PASS | `ExcludedAppsTests` (unit) |
+| Type-to-filter: title/app-name match, selection kept or moved, order restored, empty state, window opened/closed while filtered | PASS | `TypeToFilterTests` (unit) |
+| Hold-to-switch selection wraps around both ends | PASS | `CycleSelection_WrapsAroundBothEnds`; the modifier-release watcher itself is NOT RUN (needs real keys) |
+| Settings window: add/remove hidden apps, behavior toggles | PASS | `SettingsUiTests` against a fake host |
+| Close button, context menu, typing into the sidebar, "this monitor only" | NOT RUN | need real mouse/keyboard input or a second monitor; the code paths build and are covered only indirectly |
 | Exit via `--exit` while sidebar open | PASS | exit code 0, "live DWM thumbnail registrations: 0" |
 | Second launch shows the running instance's sidebar | PASS | log "Sidebar opened" after relaunch with `--show`; single process |
 | Published self-contained exe starts, shows, exits | PASS | smoke run of `artifacts\SelfContained\EdgeStage.exe` |
@@ -150,3 +155,7 @@ shortcut chosen first — Settings › Keyboard shortcut › *Use Alt+`*):
 9. Lock (Win+L) and unlock → no sidebar left on screen; the edge and shortcut still work afterwards.
 10. Change display scaling to 125 % / 150 % and, if available, use a second monitor (also one to the left of the primary) → sidebar placement, sharpness and edge zones.
 11. In Settings, record a new shortcut with the keyboard; toggle *Start with Windows* and sign out/in.
+12. Hover a card → a × appears; click it → the window closes (or asks to save) and its card disappears. Right-click a card → "Close window" and "Never show … in EdgeStage" both work.
+13. Open the sidebar with the shortcut and type part of a window title → cards filter; Backspace edits; Esc clears the filter and a second Esc closes.
+14. Turn on *Hold to switch* in Settings (with a shortcut that has a modifier): hold the modifiers, tap the key repeatedly → selection steps; release → that window comes forward. A quick tap switches to the previous window.
+15. Hide an app in Settings → its windows vanish from the sidebar; *Show again* brings them back. With two monitors, turn on *Only windows on this monitor* → the sidebar lists only that screen's windows.

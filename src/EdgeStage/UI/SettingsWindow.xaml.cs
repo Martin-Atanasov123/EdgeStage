@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -42,6 +44,7 @@ internal partial class SettingsWindow : Window
     public SettingsWindow(ISettingsHost host)
     {
         InitializeComponent();
+        MaxHeight = SystemParameters.WorkArea.Height - 40; // scrolls on small screens
         _host = host;
         _saveDelay = new DispatcherTimer(TimeSpan.FromMilliseconds(300), DispatcherPriority.Background, (_, _) => FlushPending(), Dispatcher);
         _saveDelay.Stop();
@@ -68,9 +71,76 @@ internal partial class SettingsWindow : Window
         ActivationDelayText.Text = $"{s.ActivationDelayMs} ms";
         DismissDelay.Value = Math.Min(s.DismissDelayMs, DismissDelay.Maximum);
         DismissDelayText.Text = $"{s.DismissDelayMs} ms";
+        HoldToSwitch.IsChecked = s.HoldToSwitch;
+        OnlyMonitor.IsChecked = s.OnlyPointerMonitor;
+        RefreshHiddenApps();
         LoadStartupState();
         RefreshHotkey();
         _loading = false;
+    }
+
+    // ---- behavior and hidden apps -------------------------------------------------------------------
+
+    private void OnBehaviorToggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+            return;
+        Apply(_host.Settings with
+        {
+            HoldToSwitch = HoldToSwitch.IsChecked == true,
+            OnlyPointerMonitor = OnlyMonitor.IsChecked == true,
+        });
+    }
+
+    private void RefreshHiddenApps()
+    {
+        HiddenAppsList.Children.Clear();
+        foreach (string app in _host.Settings.ExcludedApps)
+        {
+            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.Children.Add(new TextBlock { Text = app, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+            var remove = new Button
+            {
+                Content = "Show again",
+                Style = (Style)FindResource("DarkButton"),
+                Padding = new Thickness(10, 3, 10, 3),
+                Tag = app,
+            };
+            AutomationProperties.SetName(remove, $"Show {app} again");
+            remove.Click += OnRemoveHiddenApp;
+            Grid.SetColumn(remove, 1);
+            row.Children.Add(remove);
+            HiddenAppsList.Children.Add(row);
+        }
+    }
+
+    private void OnAddHiddenApp(object sender, RoutedEventArgs e)
+    {
+        string name = AppSettings.NormalizeAppName(NewApp.Text);
+        if (name.Length == 0)
+            return;
+        if (!_host.Settings.ExcludedApps.Contains(name, StringComparer.OrdinalIgnoreCase))
+            Apply(_host.Settings with { ExcludedApps = [.. _host.Settings.ExcludedApps, name] });
+        NewApp.Clear();
+        RefreshHiddenApps();
+    }
+
+    private void OnNewAppKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+        OnAddHiddenApp(sender, e);
+        e.Handled = true;
+    }
+
+    private void OnRemoveHiddenApp(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string app })
+            return;
+        Apply(_host.Settings with { ExcludedApps = _host.Settings.ExcludedApps.Where(a => !string.Equals(a, app, StringComparison.OrdinalIgnoreCase)).ToArray() });
+        RefreshHiddenApps();
     }
 
     // ---- keyboard shortcut recorder -------------------------------------------------------------

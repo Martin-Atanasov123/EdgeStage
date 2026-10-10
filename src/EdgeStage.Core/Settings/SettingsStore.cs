@@ -27,6 +27,9 @@ internal sealed class SettingsDocument
     public int? ActivationDelayMs { get; set; }
     public int? DismissDelayMs { get; set; }
     public string? Hotkey { get; set; }
+    public bool? HoldToSwitch { get; set; }
+    public bool? OnlyPointerMonitor { get; set; }
+    public string[]? ExcludedApps { get; set; }
     public bool? FirstRunTipShown { get; set; }
 }
 
@@ -108,6 +111,9 @@ public sealed class SettingsStore
             ActivationDelayMs = settings.ActivationDelayMs,
             DismissDelayMs = settings.DismissDelayMs,
             Hotkey = settings.Hotkey.ToString(),
+            HoldToSwitch = settings.HoldToSwitch,
+            OnlyPointerMonitor = settings.OnlyPointerMonitor,
+            ExcludedApps = settings.ExcludedApps.ToArray(),
             FirstRunTipShown = settings.FirstRunTipShown,
         };
         using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -128,6 +134,9 @@ public sealed class SettingsStore
             ActivationDelayMs = doc.ActivationDelayMs ?? d.ActivationDelayMs,
             DismissDelayMs = doc.DismissDelayMs ?? d.DismissDelayMs,
             Hotkey = Hotkey.TryParse(doc.Hotkey, out Hotkey hotkey) ? hotkey : d.Hotkey,
+            HoldToSwitch = doc.HoldToSwitch ?? d.HoldToSwitch,
+            OnlyPointerMonitor = doc.OnlyPointerMonitor ?? d.OnlyPointerMonitor,
+            ExcludedApps = doc.ExcludedApps ?? d.ExcludedApps,
             FirstRunTipShown = doc.FirstRunTipShown ?? false,
         };
         return settings.Normalized();

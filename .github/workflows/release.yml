@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build and test
+        run: |
+          dotnet build EdgeStage.slnx -c Release
+          dotnet test EdgeStage.slnx -c Release --no-build --filter "TestCategory!=Desktop"
+
+      - name: Publish
+        run: |
+          dotnet publish src/EdgeStage/EdgeStage.csproj -p:PublishProfile=SelfContained
+          dotnet publish src/EdgeStage/EdgeStage.csproj -p:PublishProfile=FrameworkDependent
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart("v")
+          New-Item -ItemType Directory dist | Out-Null
+          foreach ($kind in "SelfContained", "FrameworkDependent") {
+            $name = if ($kind -eq "SelfContained") { "self-contained" } else { "framework-dependent" }
+            $stage = "stage-$name"
+            New-Item -ItemType Directory $stage | Out-Null
+            Copy-Item "artifacts/$kind/EdgeStage.exe", README.md, LICENSE, CHANGELOG.md $stage
+            Compress-Archive -Path "$stage/*" -DestinationPath "dist/EdgeStage-$v-win-x64-$name.zip"
+          }
+          Get-ChildItem dist/*.zip | Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content dist/SHA256SUMS.txt
+
+      - name: Create release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* --title "EdgeStage ${{ github.ref_name }}" --generate-notes

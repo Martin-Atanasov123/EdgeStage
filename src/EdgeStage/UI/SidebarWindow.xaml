@@ -36,7 +36,23 @@
                 Background="{StaticResource SidebarBackgroundBrush}"
                 BorderBrush="{StaticResource SidebarBorderBrush}">
             <Grid>
-                <ScrollViewer x:Name="Scroller" Style="{StaticResource SlimScrollViewer}"
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Type-to-filter: shown only while there is filter text. -->
+                <Border x:Name="FilterBar" Grid.Row="0" Height="36" Margin="8,8,8,0" CornerRadius="8"
+                        Background="#33FFFFFF" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
+                        <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="12"
+                                   Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="FilterText" FontSize="13" Foreground="{StaticResource PrimaryTextBrush}"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="200" />
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer x:Name="Scroller" Grid.Row="1" Style="{StaticResource SlimScrollViewer}"
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               CanContentScroll="False" Focusable="False">
                     <ItemsControl x:Name="CardList" ItemsSource="{Binding Cards}" Focusable="False"
@@ -51,7 +67,7 @@
                     </ItemsControl>
                 </ScrollViewer>
 
-                <TextBlock x:Name="EmptyText" Text="No other open windows" FontSize="13"
+                <TextBlock x:Name="EmptyText" Grid.Row="1" Text="{Binding EmptyMessage}" FontSize="13"
                            Foreground="{StaticResource SecondaryTextBrush}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
             </Grid>

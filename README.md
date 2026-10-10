@@ -13,7 +13,7 @@ switch to that window.
 
 *(Screenshots show synthetic test windows; the previews are live DWM thumbnails, not screenshots.)*
 
-## What v1 does
+## What it does
 
 | Feature | Details |
 |---|---|
@@ -25,6 +25,11 @@ switch to that window.
 | Closing | Esc, choosing a window, clicking outside (shortcut mode), or moving the pointer away for 400 ms (configurable). |
 | Look | Floating rounded charcoal panel, subtle translucency and shadow, rounded cards with the preview inset, app icon and title, hover highlight, accent-colored selection (follows your Windows accent color), "Minimized" badge, 180 ms slide/fade in, 140 ms out. |
 | Overflow | Fixed-size cards; the list scrolls with a slim scrollbar. Previews are clipped correctly while scrolling. |
+| Close from the card | A small × appears on the card under the pointer; it asks the window to close exactly like the window's own close button (the app may still ask to save). Right-click a card for the same action. |
+| Type to filter | While the sidebar has focus (opened with the shortcut), just start typing: cards are filtered by window title or app name; Backspace edits, Esc clears the filter first and closes second. |
+| Hidden apps | Right-click a card → "Never show *app* in EdgeStage", or type a program name in Settings. Hidden apps never appear; "Show again" in Settings reverses it. |
+| Hold to switch (optional) | Alt+Tab-style: with the shortcut's modifiers held, press its key again to step through windows (add Shift to go back); release the modifiers to switch. A quick tap switches to the previous window. Off by default; needs a shortcut with a modifier. |
+| This monitor only (optional) | List just the windows on the monitor the sidebar opens on. |
 | Multiple monitors | Opens on the monitor under the pointer; edge zones exist only on outer desktop edges (not between side-by-side monitors); per-monitor DPI aware. |
 | Tray icon | Show sidebar Â· Edge activation Â· Position (left/right) Â· Activation delay Â· Shortcut Â· Start with Windows Â· Settings Â· Exit. |
 | Settings window | Shortcut recorder (checks availability, suggests a free alternative when yours is taken), edge on/off, edge side, activation and hide delays, start with Windows, open log folder. Changes apply immediately. |
@@ -36,9 +41,7 @@ switch to that window.
 > restarts, multiple monitors and other scaling levels. [docs/TESTING.md](docs/TESTING.md) lists exactly what
 > was verified, how, and what still needs a manual check.
 
-Not in v1 (on purpose): ExposÃ©/Mission Control views, virtual-desktop management, window tiling or
-grouping, an always-visible strip, hold-to-switch, per-app exclusion list, close buttons on cards,
-type-to-filter. See [Roadmap](#roadmap).
+Not included: Exposé/Mission Control views, virtual-desktop management, window tiling or grouping, an always-visible strip. See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -78,6 +81,9 @@ Command line:
   "activationDelayMs": 300,       // 0â€“2000
   "dismissDelayMs": 400,          // 0â€“3000
   "hotkey": "Ctrl+Alt+Space",     // e.g. "Alt+`", "Ctrl+Shift+Space", "Win+Alt+W"
+  "holdToSwitch": false,          // Alt+Tab-style hold and release
+  "onlyPointerMonitor": false,    // list only windows on the sidebar's monitor
+  "excludedApps": ["spotify"],    // process names that never appear
   "firstRunTipShown": true
 }
 ```
@@ -198,13 +204,11 @@ plateaus; 0 DWM registrations left at exit.
 
 ## Roadmap
 
-Ideas for v2 (none are implemented): per-app exclusion list, close button on cards, type-to-filter,
-optional hold-to-switch shortcut, grouping windows of the same app, a "this monitor only" option,
-a full-screen overview mode.
+Ideas that are not implemented: grouping windows of the same app, a full-screen overview mode, a per-app preview size, rounded corners on the zoom-to-window animation.
 
 ## Testing
 
-See [docs/TESTING.md](docs/TESTING.md) for the full report: 180 automated tests (150 unit, 30 desktop
+See [docs/TESTING.md](docs/TESTING.md) for the full report: 201 automated tests (169 unit, 32 desktop
 integration), scripted end-to-end checks with synthetic windows, and the list of checks that require
 manual testing.
 

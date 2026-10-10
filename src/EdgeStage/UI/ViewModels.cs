@@ -60,11 +60,18 @@ public sealed class CardViewModel : ObservableObject
 
     /// <summary>DWM could not create a live thumbnail for this window.</summary>
     public bool PreviewUnavailable { get => _previewUnavailable; set => Set(ref _previewUnavailable, value); }
+
+    /// <summary>True when <paramref name="filter"/> (case-insensitive) occurs in the title or the app name.</summary>
+    public bool Matches(string filter) =>
+        filter.Length == 0
+        || Title.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
+        || ProcessName.Contains(filter, StringComparison.CurrentCultureIgnoreCase);
 }
 
 /// <summary>
 /// The card list. Order is fixed while the sidebar is open: new windows are appended, closed ones
-/// removed, nothing is reshuffled under the user's pointer.
+/// removed, nothing is reshuffled under the user's pointer. <see cref="Cards"/> is what is shown
+/// (after the type-to-filter text is applied); the full list is kept privately.
 /// </summary>
 public sealed class SidebarViewModel : ObservableObject
 {
@@ -73,12 +80,37 @@ public sealed class SidebarViewModel : ObservableObject
     public const double CardHeight = 180;   // border 1.5 + 5 padding + 20 title + 4 gap + 143 thumbnail + 5 padding + 1.5 border
     public const double CardSpacing = 6;
     public const double EmptyHeight = 120;
+    public const double FilterBarHeight = 36;
 
+    private readonly List<CardViewModel> _all = [];
     private int _selectedIndex = -1;
+    private string _filter = "";
 
     public ObservableCollection<CardViewModel> Cards { get; } = [];
 
     public bool IsEmpty => Cards.Count == 0;
+
+    /// <summary>Type-to-filter text; empty shows every window.</summary>
+    public string Filter
+    {
+        get => _filter;
+        set
+        {
+            value ??= "";
+            if (value == _filter)
+                return;
+            CardViewModel? keep = Selected;
+            _filter = value;
+            ApplyFilter();
+            // Keep the same card selected if it is still shown, otherwise the first match.
+            SelectedIndex = keep is not null && Cards.Contains(keep) ? Cards.IndexOf(keep) : (Cards.Count > 0 ? 0 : -1);
+            RaiseFilterState();
+        }
+    }
+
+    public bool HasFilter => _filter.Length > 0;
+
+    public string EmptyMessage => HasFilter ? "No matching windows" : "No other open windows";
 
     public int SelectedIndex
     {
@@ -97,31 +129,41 @@ public sealed class SidebarViewModel : ObservableObject
     /// <summary>Height the card list needs, used to size the floating sidebar.</summary>
     /// <remarks>Each card carries its spacing as a bottom margin; the list's bottom margin is reduced by the
     /// same amount so the panel has equal padding top and bottom.</remarks>
-    public double ContentHeightDip => Cards.Count == 0
+    public double ContentHeightDip => (HasFilter ? FilterBarHeight : 0) + (Cards.Count == 0
         ? EmptyHeight
-        : ListPadding + Cards.Count * (CardHeight + CardSpacing) + (ListPadding - CardSpacing) + 2 /* panel border */;
+        : ListPadding + Cards.Count * (CardHeight + CardSpacing) + (ListPadding - CardSpacing) + 2 /* panel border */);
 
     public void Load(IEnumerable<WindowInfo> ordered, nint foreground, int initialSelection)
     {
+        _filter = "";
+        _all.Clear();
         Cards.Clear();
         foreach (WindowInfo info in ordered)
-            Cards.Add(new CardViewModel(info) { IsActive = info.Hwnd == foreground });
+        {
+            var card = new CardViewModel(info) { IsActive = info.Hwnd == foreground };
+            _all.Add(card);
+            Cards.Add(card);
+        }
         SelectedIndex = initialSelection;
-        Raise(nameof(IsEmpty));
+        RaiseFilterState();
     }
 
-    public CardViewModel? Find(nint hwnd) => Cards.FirstOrDefault(c => c.Hwnd == hwnd);
+    /// <summary>Finds a card among all windows, including ones hidden by the filter.</summary>
+    public CardViewModel? Find(nint hwnd) => _all.FirstOrDefault(c => c.Hwnd == hwnd);
 
     public CardViewModel Append(WindowInfo info)
     {
         var card = new CardViewModel(info);
-        Cards.Add(card);
+        _all.Add(card);
+        if (card.Matches(_filter))
+            Cards.Add(card);
         Raise(nameof(IsEmpty));
         return card;
     }
 
     public void Remove(CardViewModel card)
     {
+        _all.Remove(card);
         int index = Cards.IndexOf(card);
         if (index < 0)
             return;
@@ -142,17 +184,49 @@ public sealed class SidebarViewModel : ObservableObject
         SelectedIndex = Math.Clamp(start + delta, 0, Cards.Count - 1);
     }
 
+    /// <summary>Moves the selection by <paramref name="delta"/> and wraps around the ends (hold-to-switch).</summary>
+    public void CycleSelection(int delta)
+    {
+        if (Cards.Count == 0)
+            return;
+        int start = _selectedIndex < 0 ? 0 : _selectedIndex;
+        SelectedIndex = ((start + delta) % Cards.Count + Cards.Count) % Cards.Count;
+    }
+
     public void SetActive(nint foreground)
     {
-        foreach (CardViewModel card in Cards)
+        foreach (CardViewModel card in _all)
             card.IsActive = card.Hwnd == foreground;
     }
 
     public void Clear()
     {
+        _all.Clear();
         Cards.Clear();
+        _filter = "";
         _selectedIndex = -1;
         Raise(nameof(SelectedIndex));
+        RaiseFilterState();
+    }
+
+    private void RaiseFilterState()
+    {
+        Raise(nameof(Filter));
+        Raise(nameof(HasFilter));
         Raise(nameof(IsEmpty));
+        Raise(nameof(EmptyMessage));
+        Raise(nameof(ContentHeightDip));
+    }
+
+    private void ApplyFilter()
+    {
+        List<CardViewModel> wanted = _all.Where(c => c.Matches(_filter)).ToList();
+        var wantedSet = new HashSet<CardViewModel>(wanted);
+        for (int i = Cards.Count - 1; i >= 0; i--)
+            if (!wantedSet.Contains(Cards[i]))
+                Cards.RemoveAt(i);
+        for (int i = 0; i < wanted.Count; i++)
+            if (i >= Cards.Count || !ReferenceEquals(Cards[i], wanted[i]))
+                Cards.Insert(i, wanted[i]);
     }
 }

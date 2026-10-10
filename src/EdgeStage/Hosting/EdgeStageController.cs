@@ -37,6 +37,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
     private readonly TrayIcon _tray;
     private SettingsWindow? _settingsWindow;
     private MonitorLayout _layout;
+    private readonly DispatcherTimer _holdWatcher;
     private bool _hotkeySuspended;
     private bool _sessionLocked;
     private bool _disposed;
@@ -61,6 +62,13 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
 
         _sidebar = new SidebarWindow(_tracker);
         _sidebar.Dismissed += OnSidebarDismissed;
+        _sidebar.HideAppRequested += app =>
+        {
+            Log.Info($"Hiding app '{app}' from the sidebar.");
+            UpdateSettings(Settings with { ExcludedApps = [.. Settings.ExcludedApps, app] });
+        };
+        _holdWatcher = new DispatcherTimer(TimeSpan.FromMilliseconds(30), DispatcherPriority.Input, OnHoldTick, _dispatcher);
+        _holdWatcher.Stop();
 
         _tray = new TrayIcon(_messages.Handle, AppInfo.ProductName);
         _tray.Invoked += () => ShowSidebar(SidebarOpenMode.Hotkey);
@@ -125,13 +133,59 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         _sidebar.Open(mode, _layout.Monitors[index], Settings);
     }
 
+    /// <summary>Hold-to-switch needs at least one modifier to hold.</summary>
+    private bool HoldMode => Settings.HoldToSwitch && Settings.Hotkey.Modifiers != HotkeyModifiers.None;
+
     public void ToggleSidebar()
     {
         if (_sidebar.IsOpen)
-            _sidebar.Dismiss("hotkey pressed again");
-        else
-            ShowSidebar(SidebarOpenMode.Hotkey);
+        {
+            if (HoldMode && _sidebar.Mode == SidebarOpenMode.Hotkey)
+            {
+                // Alt+Tab-style: each further press steps forward (Shift steps back, if Shift is not part of the shortcut).
+                bool back = !Settings.Hotkey.Modifiers.HasFlag(HotkeyModifiers.Shift) && IsDown(0x10);
+                _sidebar.CycleSelection(back ? -1 : 1);
+                StartHoldWatcher();
+            }
+            else
+            {
+                _sidebar.Dismiss("hotkey pressed again");
+            }
+            return;
+        }
+
+        ShowSidebar(SidebarOpenMode.Hotkey);
+        if (HoldMode && _sidebar.IsOpen)
+            StartHoldWatcher();
     }
+
+    private void StartHoldWatcher()
+    {
+        if (!_holdWatcher.IsEnabled)
+            _holdWatcher.Start();
+    }
+
+    /// <summary>Releasing every modifier of the shortcut switches to the selected window.</summary>
+    private void OnHoldTick(object? sender, EventArgs e)
+    {
+        if (!_sidebar.IsOpen)
+        {
+            _holdWatcher.Stop();
+            return;
+        }
+        HotkeyModifiers m = Settings.Hotkey.Modifiers;
+        bool held = (m.HasFlag(HotkeyModifiers.Control) && IsDown(0x11))
+                    || (m.HasFlag(HotkeyModifiers.Alt) && IsDown(0x12))
+                    || (m.HasFlag(HotkeyModifiers.Shift) && IsDown(0x10))
+                    || (m.HasFlag(HotkeyModifiers.Win) && (IsDown(0x5B) || IsDown(0x5C)));
+        if (held)
+            return;
+        _holdWatcher.Stop();
+        Log.Info("Hold-to-switch: modifiers released, switching to the selected window.");
+        _sidebar.ActivateSelected();
+    }
+
+    private static bool IsDown(int virtualKey) => (User32.GetAsyncKeyState(virtualKey) & 0x8000) != 0;
 
     public void HideSidebar(string reason, bool immediate = false) => _sidebar.Dismiss(reason, immediate);
 
@@ -168,6 +222,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         bool hotkeyChanged = settings.Hotkey != Settings.Hotkey;
         bool edgeChanged = settings.Edge != Settings.Edge;
         Persist(settings);
+        _sidebar.ApplySettings(Settings);
         _edge.Configure(settings.EdgeActivationEnabled, settings.Edge, settings.ActivationDelayMs);
         if (edgeChanged)
             _sidebar.Dismiss("edge changed", immediate: true);
@@ -413,6 +468,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         _disposed = true;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
+        _holdWatcher.Stop();
         _settingsWindow?.Close();
         TrayMenu.CloseOpenMenu();
         _sidebar.Dismiss("exit", immediate: true);

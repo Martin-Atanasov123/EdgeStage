@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build EdgeStage.slnx -c Release
+
+      # Tests tagged "Desktop" need an interactive desktop session (real windows, hotkeys, DWM),
+      # so CI runs the pure unit tests only. See docs/TESTING.md.
+      - name: Unit tests
+        run: dotnet test EdgeStage.slnx -c Release --no-build --filter "TestCategory!=Desktop"

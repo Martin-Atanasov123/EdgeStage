@@ -264,6 +264,51 @@ public sealed class SettingsUiTests
         Assert.AreEqual(host.Calls.Count(c => c == "suspend"), host.Calls.Count(c => c == "resume"));
     }
 
+    [STATestMethod]
+    public void Settings_HiddenApps_AddNormalizeAndRemove()
+    {
+        var host = new FakeHost { Settings = AppSettings.Default with { ExcludedApps = ["discord"] } };
+        var window = OpenSettings(host);
+        try
+        {
+            Assert.AreEqual(1, window.HiddenAppsList.Children.Count);
+
+            window.NewApp.Text = "  Spotify.EXE ";
+            window.NewApp.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice,
+                PresentationSource.FromVisual(window)!, 0, Key.Enter) { RoutedEvent = Keyboard.KeyDownEvent });
+
+            CollectionAssert.AreEqual(new[] { "discord", "spotify" }, host.Settings.ExcludedApps.ToArray());
+            Assert.AreEqual(2, window.HiddenAppsList.Children.Count);
+            Assert.AreEqual("", window.NewApp.Text);
+
+            // "Show again" on the first row.
+            var row = (Grid)window.HiddenAppsList.Children[0];
+            var button = row.Children.OfType<Button>().Single();
+            button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+
+            CollectionAssert.AreEqual(new[] { "spotify" }, host.Settings.ExcludedApps.ToArray());
+            Assert.AreEqual(1, window.HiddenAppsList.Children.Count);
+        }
+        finally { window.Close(); }
+    }
+
+    [STATestMethod]
+    public void Settings_BehaviorToggles_ApplyImmediately()
+    {
+        var host = new FakeHost();
+        var window = OpenSettings(host);
+        try
+        {
+            window.HoldToSwitch.IsChecked = true;
+            Assert.IsTrue(host.Settings.HoldToSwitch);
+
+            window.OnlyMonitor.IsChecked = true;
+            Assert.IsTrue(host.Settings.OnlyPointerMonitor);
+            Assert.IsTrue(host.Settings.HoldToSwitch, "the other toggle must be preserved");
+        }
+        finally { window.Close(); }
+    }
+
     // ---- start with Windows against the real registry (scratch key) ------------------------------------
 
     [TestMethod]

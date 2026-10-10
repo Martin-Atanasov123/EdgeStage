@@ -66,6 +66,7 @@
                     <ColumnDefinition Width="6" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <Image Grid.Column="0" Width="16" Height="16" VerticalAlignment="Center"
@@ -91,6 +92,40 @@
                              ToolTip="Current window"
                              Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
+
+                <!-- Appears while the pointer is over the card; asks the window to close like its own X button. -->
+                <Button x:Name="CloseButton" Grid.Column="4" Width="20" Height="20" Margin="6,0,0,0"
+                        Click="OnCloseClicked" Focusable="False" Cursor="Arrow"
+                        ToolTip="Close window" AutomationProperties.Name="Close window">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Visibility" Value="Hidden" />
+                            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd" CornerRadius="5" Background="Transparent">
+                                            <TextBlock Text="&#xE711;" FontFamily="{StaticResource IconFont}" FontSize="10"
+                                                       Foreground="{TemplateBinding Foreground}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#CCC42B1C" />
+                                                <Setter Property="Foreground" Value="White" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=Root}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
             </Grid>
         </Grid>
     </Border>

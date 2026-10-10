@@ -31,6 +31,7 @@
         </Style>
     </Window.Resources>
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
     <StackPanel Margin="20,16,20,18">
         <!-- Header -->
         <Grid>
@@ -138,6 +139,50 @@
             </StackPanel>
         </Border>
 
+        <TextBlock Text="BEHAVIOR" Style="{StaticResource SectionHeader}" />
+
+        <Border Style="{StaticResource Row}">
+            <CheckBox x:Name="HoldToSwitch" Style="{StaticResource ToggleSwitch}" Checked="OnBehaviorToggled" Unchecked="OnBehaviorToggled">
+                <StackPanel>
+                    <TextBlock Text="Hold to switch (like Alt+Tab)" />
+                    <TextBlock Text="Keep the shortcut's modifier keys held and press its key again to step through windows; release to switch. Needs a shortcut with a modifier." Style="{StaticResource Hint}" />
+                </StackPanel>
+            </CheckBox>
+        </Border>
+
+        <Border Style="{StaticResource Row}">
+            <CheckBox x:Name="OnlyMonitor" Style="{StaticResource ToggleSwitch}" Checked="OnBehaviorToggled" Unchecked="OnBehaviorToggled">
+                <StackPanel>
+                    <TextBlock Text="Only windows on this monitor" />
+                    <TextBlock Text="List just the windows that are on the screen the sidebar opens on." Style="{StaticResource Hint}" />
+                </StackPanel>
+            </CheckBox>
+        </Border>
+
+        <TextBlock Text="HIDDEN APPS" Style="{StaticResource SectionHeader}" />
+
+        <Border Style="{StaticResource Row}">
+            <StackPanel>
+                <TextBlock Text="Windows of these apps never appear in the sidebar." />
+                <TextBlock x:Name="HiddenAppsHint" Style="{StaticResource Hint}"
+                           Text="Right-click a card and choose “Never show …”, or type a program name such as spotify." />
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="NewApp" Height="30" Padding="8,4" VerticalContentAlignment="Center"
+                             Background="{StaticResource ControlBrush}" Foreground="{StaticResource PrimaryTextBrush}"
+                             BorderBrush="{StaticResource ControlBorderBrush}" CaretBrush="{StaticResource PrimaryTextBrush}"
+                             AutomationProperties.Name="Program name to hide" KeyDown="OnNewAppKeyDown" />
+                    <Button Grid.Column="1" Content="Hide app" Style="{StaticResource DarkButton}" Margin="8,0,0,0" Padding="12,4" Click="OnAddHiddenApp" />
+                </Grid>
+                <ScrollViewer MaxHeight="130" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0" Focusable="False">
+                    <StackPanel x:Name="HiddenAppsList" />
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
+
         <TextBlock Text="GENERAL" Style="{StaticResource SectionHeader}" />
 
         <Border Style="{StaticResource Row}">
@@ -160,4 +205,5 @@
             <Button Grid.Column="2" Content="Close" Style="{StaticResource DarkButton}" IsCancel="True" Click="OnClose" />
         </Grid>
     </StackPanel>
+    </ScrollViewer>
 </Window>

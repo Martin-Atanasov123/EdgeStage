@@ -62,6 +62,7 @@ public partial class SidebarWindow : Window
     private bool _activating;
     private readonly ZoomOverlay _zoom = new();
     private readonly CornerMaskWindow _mask;
+    private AppSettings _settings = AppSettings.Default;
 
     private readonly Stopwatch _animationClock = new();
     private bool _animating;
@@ -96,8 +97,17 @@ public partial class SidebarWindow : Window
         _vm.PropertyChanged += (_, e) =>
         {
             // The corner shapes take the card's hover/selected color.
-            if (IsOpen && e.PropertyName == nameof(SidebarViewModel.SelectedIndex))
+            if (!IsOpen)
+                return;
+            if (e.PropertyName == nameof(SidebarViewModel.SelectedIndex))
                 _thumbs.Update();
+            else if (e.PropertyName == nameof(SidebarViewModel.HasFilter) || e.PropertyName == nameof(SidebarViewModel.Filter))
+            {
+                FilterBar.Visibility = _vm.HasFilter ? Visibility.Visible : Visibility.Collapsed;
+                FilterText.Text = _vm.Filter;
+                PlaceWindow();
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, _thumbs.Update);
+            }
         };
         Deactivated += (_, _) =>
         {
@@ -105,6 +115,9 @@ public partial class SidebarWindow : Window
                 Dismiss(_activating ? "window selected" : "clicked outside");
         };
         PreviewKeyDown += OnPreviewKeyDown;
+        PreviewTextInput += OnPreviewTextInput;
+        AddHandler(PreviewCard.CloseRequestedEvent, new RoutedEventHandler(OnCloseRequested));
+        AddHandler(PreviewCard.HideAppRequestedEvent, new RoutedEventHandler(OnHideAppRequested));
         Closed += (_, _) =>
         {
             _zoom.Close();
@@ -123,6 +136,9 @@ public partial class SidebarWindow : Window
     /// <summary>Windows refused the switch after the sidebar had already closed (card title, result).</summary>
     public event Action<string, ActivationResult>? ActivationFailed;
 
+    /// <summary>The user chose "Never show this app" for the given process name.</summary>
+    public event Action<string>? HideAppRequested;
+
     // ---- open / dismiss --------------------------------------------------------------------------
 
     public void Open(SidebarOpenMode mode, MonitorArea monitor, AppSettings settings)
@@ -136,10 +152,12 @@ public partial class SidebarWindow : Window
         _monitor = monitor;
         _edge = settings.Edge;
         _dismissDelayMs = settings.DismissDelayMs;
+        _settings = settings;
+        FilterBar.Visibility = Visibility.Collapsed;
 
         // Capture the foreground window before EdgeStage itself appears.
         nint foreground = User32.GetForegroundWindow();
-        List<WindowInfo> windows = WindowEnumerator.Enumerate().Where(TestHooks.IsListed).ToList();
+        List<WindowInfo> windows = WindowEnumerator.Enumerate().Where(IsListed).ToList();
         _tracker.Mru.PruneWhere(User32.IsWindow);
         List<WindowInfo> ordered = _tracker.Mru.Order(windows, w => w.Hwnd, foreground);
 
@@ -149,6 +167,8 @@ public partial class SidebarWindow : Window
         for (int i = 0; i < ordered.Count; i++)
             _icons.Apply(_vm.Cards[i], ordered[i]);
         EmptyText.Visibility = _vm.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
+        Log.Debug($"Listing {ordered.Count} windows ({_settings.ExcludedApps.Count} hidden apps, " +
+                  $"{(_settings.OnlyPointerMonitor ? "this monitor only" : "all monitors")}).");
 
         SetExStyle(WS_EX_NOACTIVATE, mode == SidebarOpenMode.Edge);
         PlaceWindow();
@@ -337,7 +357,7 @@ public partial class SidebarWindow : Window
         switch (kind)
         {
             case WindowEventKind.Shown or WindowEventKind.Uncloaked:
-                if (card is null && WindowEnumerator.TryRead(hwnd) is { } info && TestHooks.IsListed(info))
+                if (card is null && WindowEnumerator.TryRead(hwnd) is { } info && IsListed(info))
                     AddCard(info);
                 break;
 
@@ -425,7 +445,13 @@ public partial class SidebarWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
-                Dismiss("escape");
+                if (_vm.HasFilter)
+                    _vm.Filter = "";      // first Esc clears the filter, the next one closes
+                else
+                    Dismiss("escape");
+                break;
+            case Key.Back when _vm.HasFilter:
+                _vm.Filter = _vm.Filter[..^1];
                 break;
             case Key.Down or Key.Right:
             case Key.Tab when !shift:
@@ -449,6 +475,8 @@ public partial class SidebarWindow : Window
                 _vm.SelectedIndex = _vm.Cards.Count - 1;
                 ScrollSelectedIntoView();
                 break;
+            case Key.Space when _vm.HasFilter:
+                return; // part of the filter text; handled in PreviewTextInput
             case Key.Enter or Key.Space:
                 if (_vm.Selected is { } selected)
                     ActivateCard(selected);
@@ -457,6 +485,77 @@ public partial class SidebarWindow : Window
                 return;
         }
         e.Handled = true;
+    }
+
+    /// <summary>Printable characters typed while the sidebar has focus filter the cards.</summary>
+    private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        string text = e.Text;
+        if (!IsOpen || string.IsNullOrEmpty(text) || text.Any(char.IsControl) || _vm.Filter.Length >= 40)
+            return;
+        if (text == " " && !_vm.HasFilter)
+            return;
+        _vm.Filter += text;
+        e.Handled = true;
+    }
+
+    /// <summary>Whether a window belongs in the sidebar under the current settings.</summary>
+    private bool IsListed(WindowInfo window)
+    {
+        if (!TestHooks.IsListed(window) || _settings.IsExcluded(window.ProcessName))
+            return false;
+        if (_settings.OnlyPointerMonitor && _monitor is not null
+            && User32.MonitorFromWindow(window.Hwnd, MONITOR_DEFAULTTONEAREST) != _monitor.Handle)
+            return false;
+        return true;
+    }
+
+    /// <summary>Applies changed settings to an open sidebar (e.g. an app was just hidden).</summary>
+    public void ApplySettings(AppSettings settings)
+    {
+        _settings = settings;
+        if (!IsOpen)
+            return;
+        foreach (CardViewModel card in _vm.Cards.Where(c => settings.IsExcluded(c.ProcessName)).ToList())
+            RemoveCard(card, "app hidden");
+    }
+
+    /// <summary>Hold-to-switch: moves the selection with wrap-around (negative = backwards).</summary>
+    public void CycleSelection(int delta)
+    {
+        if (!IsOpen)
+            return;
+        _vm.CycleSelection(delta);
+        ScrollSelectedIntoView();
+    }
+
+    /// <summary>Switches to the selected card (used when the hold-to-switch modifiers are released).</summary>
+    public void ActivateSelected()
+    {
+        if (IsOpen && _vm.Selected is { } card)
+            ActivateCard(card);
+        else
+            Dismiss("nothing selected");
+    }
+
+    private void OnCloseRequested(object sender, RoutedEventArgs e)
+    {
+        if ((e.OriginalSource as FrameworkElement)?.DataContext is not CardViewModel card)
+            return;
+        e.Handled = true;
+        // Same as clicking the window's own close button: the app may ask to save first.
+        if (!User32.PostMessage(card.Hwnd, WM_CLOSE, 0, 0))
+            Log.Warn($"Could not post WM_CLOSE to 0x{card.Hwnd:X} ({card.ProcessName}).");
+        else
+            Log.Info($"Asked {card.ProcessName} (0x{card.Hwnd:X}) to close.");
+    }
+
+    private void OnHideAppRequested(object sender, RoutedEventArgs e)
+    {
+        if ((e.OriginalSource as FrameworkElement)?.DataContext is not CardViewModel { ProcessName.Length: > 0 } card)
+            return;
+        e.Handled = true;
+        HideAppRequested?.Invoke(card.ProcessName);
     }
 
     private void MoveSelection(int delta)
