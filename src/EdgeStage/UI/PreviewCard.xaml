@@ -13,7 +13,7 @@
         <ui:NullToVisibilityConverter x:Key="NullToVisible" Invert="True" />
     </UserControl.Resources>
 
-    <Border x:Name="Root" CornerRadius="10" BorderThickness="1.5" Padding="8"
+    <Border x:Name="Root" CornerRadius="10" BorderThickness="1.5" Padding="5"
             Height="{x:Static ui:SidebarViewModel.CardHeight}"
             Cursor="Hand" SnapsToDevicePixels="True">
         <Border.Style>
@@ -21,8 +21,12 @@
                 <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
                 <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
                 <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                        <Setter Property="BorderBrush" Value="#8060CDFF" />
+                    </DataTrigger>
                     <Trigger Property="IsMouseOver" Value="True">
                         <Setter Property="Background" Value="{StaticResource CardHoverBrush}" />
+                        <Setter Property="BorderBrush" Value="#B3FFFFFF" />
                     </Trigger>
                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
                         <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
@@ -34,9 +38,9 @@
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="140" />
-                <RowDefinition Height="6" />
                 <RowDefinition Height="20" />
+                <RowDefinition Height="4" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <!--
@@ -44,7 +48,7 @@
                 element, so its content (the large icon) is only visible when no thumbnail is
                 drawn: preview unavailable, or DWM has nothing for the window.
             -->
-            <Border x:Name="ThumbHost" Grid.Row="0" CornerRadius="4" Background="{StaticResource ThumbPlaceholderBrush}">
+            <Border x:Name="ThumbHost" Grid.Row="2" CornerRadius="4" Background="{StaticResource ThumbPlaceholderBrush}">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     <Image Width="40" Height="40" Opacity="0.6" Source="{Binding Icon}"
                            Visibility="{Binding Icon, Converter={StaticResource NullToCollapsed}}" />
@@ -56,7 +60,7 @@
                 </StackPanel>
             </Border>
 
-            <Grid Grid.Row="2">
+            <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="16" />
                     <ColumnDefinition Width="6" />

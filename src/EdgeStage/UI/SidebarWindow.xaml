@@ -43,7 +43,7 @@
                                   Margin="{x:Static ui:SidebarWindow.ListMargin}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <ui:PreviewCard Margin="0,0,0,8"
+                                <ui:PreviewCard Margin="0,0,0,6"
                                                 MouseEnter="OnCardMouseEnter"
                                                 MouseLeftButtonUp="OnCardClicked" />
                             </DataTemplate>

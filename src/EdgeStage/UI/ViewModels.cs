@@ -69,9 +69,9 @@ public sealed class CardViewModel : ObservableObject
 public sealed class SidebarViewModel : ObservableObject
 {
     // Layout constants (DIPs) shared with the XAML templates.
-    public const double ListPadding = 10;
-    public const double CardHeight = 182;   // 8 padding + 140 thumbnail + 6 gap + 20 title + 8 padding
-    public const double CardSpacing = 8;
+    public const double ListPadding = 8;
+    public const double CardHeight = 180;   // border 1.5 + 5 padding + 20 title + 4 gap + 143 thumbnail + 5 padding + 1.5 border
+    public const double CardSpacing = 6;
     public const double EmptyHeight = 120;
 
     private int _selectedIndex = -1;

@@ -106,8 +106,8 @@ public sealed class SidebarViewModelTests
     [TestMethod]
     public void ContentHeight_MatchesCardPitchPlusPadding()
     {
-        // 10 top padding + n × (182 card + 8 spacing) + 2 bottom (10 − 8) + 2 border
-        Assert.AreEqual(10 + 4 * 190 + 2 + 2, Loaded(4).ContentHeightDip, 1e-9);
+        // 8 top padding + n × (180 card + 6 spacing) + 2 bottom (8 − 6) + 2 border
+        Assert.AreEqual(8 + 4 * 186 + 2 + 2, Loaded(4).ContentHeightDip, 1e-9);
         Assert.AreEqual(SidebarViewModel.EmptyHeight, new SidebarViewModel().ContentHeightDip, 1e-9);
     }
 
