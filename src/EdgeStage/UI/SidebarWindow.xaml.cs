@@ -60,6 +60,7 @@ public partial class SidebarWindow : Window
     private bool _pointerEntered;
     private long _outsideSinceMs = -1;
     private bool _activating;
+    private readonly ZoomOverlay _zoom = new();
 
     private readonly Stopwatch _animationClock = new();
     private bool _animating;
@@ -96,6 +97,7 @@ public partial class SidebarWindow : Window
                 Dismiss(_activating ? "window selected" : "clicked outside");
         };
         PreviewKeyDown += OnPreviewKeyDown;
+        Closed += (_, _) => _zoom.Close();
     }
 
     public bool IsOpen { get; private set; }
@@ -105,6 +107,9 @@ public partial class SidebarWindow : Window
 
     /// <summary>Raised after the sidebar has hidden and released its resources, with the reason.</summary>
     public event Action<string>? Dismissed;
+
+    /// <summary>Windows refused the switch after the sidebar had already closed (card title, result).</summary>
+    public event Action<string, ActivationResult>? ActivationFailed;
 
     // ---- open / dismiss --------------------------------------------------------------------------
 
@@ -481,6 +486,22 @@ public partial class SidebarWindow : Window
         try
         {
             card.Notice = null;
+
+            if (SystemParameters.ClientAreaAnimation && PlanZoom(card) is { } plan)
+            {
+                // Activation starts together with the animation, while this process still holds the
+                // foreground (hiding the sidebar hands it to another app, after which Windows refuses).
+                Dismiss("window selected");
+                ActivationResult zoomed = await _zoom.PlayAsync(card.Hwnd, plan.Bounds, plan.From, plan.To,
+                    () => WindowActivator.ActivateAsync(card.Hwnd));
+                if (zoomed.Outcome == ActivationOutcome.Refused)
+                {
+                    Log.Warn($"Activation refused for 0x{card.Hwnd:X} ({card.ProcessName}): {zoomed.Detail}");
+                    ActivationFailed?.Invoke(card.Title, zoomed);
+                }
+                return;
+            }
+
             ActivationResult result = await WindowActivator.ActivateAsync(card.Hwnd);
             switch (result.Outcome)
             {
@@ -506,6 +527,32 @@ public partial class SidebarWindow : Window
         {
             _activating = false;
         }
+    }
+
+    /// <summary>Start/end rectangles (screen device px) for the zoom transition, or null when it cannot be drawn.</summary>
+    private (RECT Bounds, EdgeStage.Core.Thumbnails.PixelRect From, EdgeStage.Core.Thumbnails.PixelRect To)? PlanZoom(CardViewModel card)
+    {
+        if (_monitor is null || _thumbs.GetCardPreview(card) is not { } preview)
+            return null;
+        RECT target = ZoomOverlay.TargetRect(card.Hwnd);
+        if (target.IsEmpty)
+            return null;
+
+        var origin = new POINT(0, 0);
+        User32.ClientToScreen(_hwnd, ref origin);
+        var from = new EdgeStage.Core.Thumbnails.PixelRect(
+            preview.Rect.X + origin.X, preview.Rect.Y + origin.Y, preview.Rect.Width, preview.Rect.Height);
+
+        // Same aspect ratio as the preview, centered in the window's rectangle (they differ only for minimized windows).
+        var to = EdgeStage.Core.Thumbnails.ThumbnailGeometry.FitInside(
+            new EdgeStage.Core.Thumbnails.PixelRect(target.Left, target.Top, target.Width, target.Height),
+            preview.Source.Width, preview.Source.Height, maxScale: 100);
+
+        RECT other = ZoomOverlay.MonitorBoundsOf(card.Hwnd, _monitor.Bounds);
+        var bounds = new RECT(
+            Math.Min(_monitor.Bounds.Left, other.Left), Math.Min(_monitor.Bounds.Top, other.Top),
+            Math.Max(_monitor.Bounds.Right, other.Right), Math.Max(_monitor.Bounds.Bottom, other.Bottom));
+        return (bounds, from, to);
     }
 
     // ---- native helpers ----------------------------------------------------------------------------

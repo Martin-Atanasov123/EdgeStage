@@ -107,6 +107,19 @@ internal sealed class ThumbnailLayoutCoordinator
         return changed;
     }
 
+    /// <summary>Where a card's preview is drawn (window client device px) and the source window size; null if it has none.</summary>
+    public (PixelRect Rect, SIZE Source)? GetCardPreview(CardViewModel card)
+    {
+        if (!_registrations.TryGetValue(card, out ThumbnailRegistration? registration)
+            || FindHost(card) is not { ActualWidth: > 0 } host
+            || registration.SourceSize.Width <= 0)
+            return null;
+        double scale = VisualTreeHelper.GetDpi(_window).DpiScaleX;
+        PixelRect hostRect = ToDevice(host, new Rect(0, 0, host.ActualWidth, host.ActualHeight), scale);
+        PixelRect fitted = ThumbnailGeometry.FitInside(hostRect, registration.SourceSize.Width, registration.SourceSize.Height);
+        return fitted.IsEmpty ? null : (fitted, registration.SourceSize);
+    }
+
     public void ReleaseAll()
     {
         foreach (ThumbnailRegistration registration in _registrations.Values)

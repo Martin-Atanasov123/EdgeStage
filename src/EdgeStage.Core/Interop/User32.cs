@@ -87,6 +87,10 @@ public static partial class User32
 
     [LibraryImport(Lib)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetWindowPlacement(nint hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [LibraryImport(Lib)]
+    [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetClientRect(nint hWnd, out RECT lpRect);
 
     [LibraryImport(Lib)]

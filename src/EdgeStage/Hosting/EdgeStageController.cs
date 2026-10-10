@@ -66,6 +66,9 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         _tray.Invoked += () => ShowSidebar(SidebarOpenMode.Hotkey);
         _tray.ContextMenuRequested += () => TrayMenu.Show(this);
         _tray.BalloonClicked += OpenSettings;
+        _sidebar.ActivationFailed += (title, result) => _tray.ShowBalloon($"Couldn't switch to {title}",
+            result.TargetElevated ? "That window runs as administrator, which Windows does not let EdgeStage switch to."
+                                  : "Windows did not allow the switch.", warning: true);
     }
 
     public AppSettings Settings { get; private set; }
