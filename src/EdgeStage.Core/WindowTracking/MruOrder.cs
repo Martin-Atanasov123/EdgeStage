@@ -27,6 +27,13 @@ public sealed class MruOrder
             _lastActivated.Remove(hwnd);
     }
 
+    /// <summary>Drops entries for which <paramref name="keep"/> is false (e.g. windows that no longer exist).</summary>
+    public void PruneWhere(Func<nint, bool> keep)
+    {
+        foreach (nint hwnd in _lastActivated.Keys.Where(h => !keep(h)).ToList())
+            _lastActivated.Remove(hwnd);
+    }
+
     public int Count => _lastActivated.Count;
 
     /// <summary>

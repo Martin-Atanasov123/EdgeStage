@@ -109,6 +109,14 @@ public static partial class User32
     [LibraryImport(Lib)]
     public static partial nint GetForegroundWindow();
 
+    /// <summary>Lets <paramref name="dwProcessId"/> take the foreground (used when a second launch hands over to the running instance).</summary>
+    [LibraryImport(Lib, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool AllowSetForegroundWindow(uint dwProcessId);
+
+    [LibraryImport(Lib, EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial nint FindWindow(string? lpClassName, string? lpWindowName);
+
     [LibraryImport(Lib, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);

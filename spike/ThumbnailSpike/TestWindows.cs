@@ -27,6 +27,17 @@ internal sealed class SourceWindow : Window
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
         }
+        _fill.Child = new TextBlock
+        {
+            Text = title,
+            FontSize = 28,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromArgb(0xCC, 0x10, 0x10, 0x10)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(24),
+        };
         Content = _fill;
         SetColor(color);
     }

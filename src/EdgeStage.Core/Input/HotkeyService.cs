@@ -60,6 +60,24 @@ public sealed class HotkeyService : IDisposable
         return new HotkeyRegistrationResult(status, error);
     }
 
+    /// <summary>
+    /// Registers a bare key (no modifiers) such as Escape. Only for short-lived use while EdgeStage
+    /// is on screen without keyboard focus; callers must <see cref="Unregister"/> it promptly,
+    /// because while registered the key does not reach other applications.
+    /// </summary>
+    public HotkeyRegistrationResult RegisterTransientKey(int id, int virtualKey)
+    {
+        Unregister(id);
+        if (User32.RegisterHotKey(_window, id, MOD_NOREPEAT, (uint)virtualKey))
+        {
+            _registered[id] = new Hotkey(HotkeyModifiers.None, virtualKey);
+            return new HotkeyRegistrationResult(HotkeyRegistrationStatus.Registered);
+        }
+        int error = Marshal.GetLastPInvokeError();
+        Log.Warn($"Transient key 0x{virtualKey:X2} could not be registered (Win32 error {error}).");
+        return new HotkeyRegistrationResult(error == ERROR_HOTKEY_ALREADY_REGISTERED ? HotkeyRegistrationStatus.Conflict : HotkeyRegistrationStatus.Failed, error);
+    }
+
     /// <summary>Checks whether a combination is free right now by registering and releasing it.</summary>
     public HotkeyRegistrationResult Probe(Hotkey hotkey, int probeId = 0xBFFF)
     {

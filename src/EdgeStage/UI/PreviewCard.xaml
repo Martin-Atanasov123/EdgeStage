@@ -1,0 +1,93 @@
+<UserControl x:Class="EdgeStage.UI.PreviewCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:EdgeStage.UI"
+             d:DataContext="{d:DesignInstance ui:CardViewModel}"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             FontFamily="{StaticResource UiFont}">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <ui:NullToVisibilityConverter x:Key="NullToCollapsed" />
+        <ui:NullToVisibilityConverter x:Key="NullToVisible" Invert="True" />
+    </UserControl.Resources>
+
+    <Border x:Name="Root" CornerRadius="10" BorderThickness="1.5" Padding="8"
+            Height="{x:Static ui:SidebarViewModel.CardHeight}"
+            Cursor="Hand" SnapsToDevicePixels="True">
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{StaticResource CardHoverBrush}" />
+                    </Trigger>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                        <Setter Property="Background" Value="{StaticResource CardHoverBrush}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="140" />
+                <RowDefinition Height="6" />
+                <RowDefinition Height="20" />
+            </Grid.RowDefinitions>
+
+            <!--
+                ThumbHost marks where the live DWM thumbnail is composited. DWM draws ABOVE this
+                element, so its content (the large icon) is only visible when no thumbnail is
+                drawn: preview unavailable, or DWM has nothing for the window.
+            -->
+            <Border x:Name="ThumbHost" Grid.Row="0" CornerRadius="4" Background="{StaticResource ThumbPlaceholderBrush}">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <Image Width="40" Height="40" Opacity="0.6" Source="{Binding Icon}"
+                           Visibility="{Binding Icon, Converter={StaticResource NullToCollapsed}}" />
+                    <Image Width="32" Height="32" Source="{StaticResource GenericAppIcon}"
+                           Visibility="{Binding Icon, Converter={StaticResource NullToVisible}}" />
+                    <TextBlock Text="Preview unavailable" Margin="0,8,0,0" FontSize="11"
+                               Foreground="{StaticResource SecondaryTextBrush}" HorizontalAlignment="Center"
+                               Visibility="{Binding PreviewUnavailable, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Image Grid.Column="0" Width="16" Height="16" VerticalAlignment="Center"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       Source="{Binding Icon, TargetNullValue={StaticResource GenericAppIcon}}" />
+
+                <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="12.5"
+                           Foreground="{StaticResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis"
+                           Text="{Binding Title}" ToolTip="{Binding Title}"
+                           Visibility="{Binding Notice, Converter={StaticResource NullToVisible}}" />
+                <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="11.5"
+                           Foreground="{StaticResource WarningTextBrush}" TextTrimming="CharacterEllipsis"
+                           Text="{Binding Notice}" ToolTip="{Binding Notice}"
+                           Visibility="{Binding Notice, Converter={StaticResource NullToCollapsed}}" />
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                    <Border CornerRadius="4" Padding="5,1" Background="{StaticResource BadgeBackgroundBrush}"
+                            Visibility="{Binding IsMinimized, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="Minimized: the preview shows the window as it was when it was minimized.">
+                        <TextBlock Text="Minimized" FontSize="10" Foreground="{StaticResource SecondaryTextBrush}" />
+                    </Border>
+                    <Ellipse Width="6" Height="6" Margin="6,0,0,0" Fill="{StaticResource AccentBrush}"
+                             ToolTip="Current window"
+                             Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

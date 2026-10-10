@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EdgeStage.Core\EdgeStage.Core.csproj" />
+    <ProjectReference Include="..\..\src\EdgeStage\EdgeStage.csproj" />
   </ItemGroup>
 
 </Project>

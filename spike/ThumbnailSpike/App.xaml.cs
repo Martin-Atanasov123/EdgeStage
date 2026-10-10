@@ -43,6 +43,40 @@ public partial class App : Application
                 return;
             }
 
+            if (args.Length >= 3 && args[0] == "--capture-window")
+            {
+                // --capture-window <exact title> <out prefix> [frames] [intervalMs]
+                int frames = args.Length >= 4 ? int.Parse(args[3]) : 1;
+                int interval = args.Length >= 5 ? int.Parse(args[4]) : 250;
+                File.WriteAllText(args[2] + ".txt", await Capture.WindowFrames(args[1], args[2], frames, interval));
+                Shutdown(0);
+                return;
+            }
+
+            if (args.Length >= 5 && args[0] == "--backdrop")
+            {
+                // --backdrop <left> <top> <width> <height>: opaque neutral surface so screenshots of
+                // the translucent sidebar show nothing of the user's own windows behind it.
+                var backdrop = new Window
+                {
+                    WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false,
+                    Left = double.Parse(args[1]), Top = double.Parse(args[2]), Width = double.Parse(args[3]), Height = double.Parse(args[4]),
+                    Background = new LinearGradientBrush(Color.FromRgb(0x3A, 0x4A, 0x6A), Color.FromRgb(0x6A, 0x4A, 0x5A), 45),
+                    Title = "EdgeStage Spike Backdrop", ShowActivated = false, Topmost = true,
+                };
+                // Tool window: never listed by EdgeStage (or Alt+Tab).
+                backdrop.SourceInitialized += (_, _) =>
+                {
+                    nint h = new System.Windows.Interop.WindowInteropHelper(backdrop).Handle;
+                    long ex = EdgeStage.Core.Interop.User32.GetWindowLongPtr(h, EdgeStage.Core.Interop.NativeConstants.GWL_EXSTYLE);
+                    EdgeStage.Core.Interop.User32.SetWindowLongPtr(h, EdgeStage.Core.Interop.NativeConstants.GWL_EXSTYLE,
+                        (nint)(ex | EdgeStage.Core.Interop.NativeConstants.WS_EX_TOOLWINDOW));
+                };
+                backdrop.Closed += (_, _) => Shutdown();
+                backdrop.Show();
+                return;
+            }
+
             if (args.Length >= 2 && args[0] == "--realprobe")
             {
                 var report = await new RealWindowProbe().RunAsync();
