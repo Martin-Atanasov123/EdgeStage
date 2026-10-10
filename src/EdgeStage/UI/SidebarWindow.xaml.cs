@@ -61,6 +61,7 @@ public partial class SidebarWindow : Window
     private long _outsideSinceMs = -1;
     private bool _activating;
     private readonly ZoomOverlay _zoom = new();
+    private readonly CornerMaskWindow _mask;
 
     private readonly Stopwatch _animationClock = new();
     private bool _animating;
@@ -73,7 +74,8 @@ public partial class SidebarWindow : Window
         InitializeComponent();
         _tracker = tracker;
         DataContext = _vm;
-        _thumbs = new ThumbnailLayoutCoordinator(this, CardList, Scroller);
+        _mask = new CornerMaskWindow(new WindowInteropHelper(this).EnsureHandle());
+        _thumbs = new ThumbnailLayoutCoordinator(this, CardList, Scroller, _mask);
         _thumbs.SourceLost += card => RemoveCard(card, "source window gone");
 
         _hwnd = new WindowInteropHelper(this).EnsureHandle();
@@ -91,13 +93,23 @@ public partial class SidebarWindow : Window
         CardList.LayoutUpdated += (_, _) => _thumbs.Update();
         Scroller.ScrollChanged += (_, _) => _thumbs.Update();
         _vm.Cards.CollectionChanged += OnCardsChanged;
+        _vm.PropertyChanged += (_, e) =>
+        {
+            // The corner shapes take the card's hover/selected color.
+            if (IsOpen && e.PropertyName == nameof(SidebarViewModel.SelectedIndex))
+                _thumbs.Update();
+        };
         Deactivated += (_, _) =>
         {
             if (IsOpen && Mode == SidebarOpenMode.Hotkey)
                 Dismiss(_activating ? "window selected" : "clicked outside");
         };
         PreviewKeyDown += OnPreviewKeyDown;
-        Closed += (_, _) => _zoom.Close();
+        Closed += (_, _) =>
+        {
+            _zoom.Close();
+            _mask.Close();
+        };
     }
 
     public bool IsOpen { get; private set; }
@@ -166,6 +178,7 @@ public partial class SidebarWindow : Window
             _thumbs.Sync(_vm.Cards, _hwnd);
             UpdateLayout();
             ScrollSelectedIntoView();
+            _mask.ShowMask();
             _thumbs.Update();
             StartAnimation(show: true);
             Log.Info($"Sidebar opened ({mode}) on monitor {monitor.Bounds} @ {monitor.Dpi} dpi: " +
@@ -295,6 +308,7 @@ public partial class SidebarWindow : Window
 
         // Physical pixels via SetWindowPos: unambiguous on mixed-DPI monitor setups.
         User32.SetWindowPos(_hwnd, HWND_TOPMOST, window.Left, window.Top, window.Width, window.Height, SWP_NOACTIVATE);
+        _mask.Place(window);
         _keepOpen = SidebarPlacement.KeepOpenRegion(panel, _edge, _monitor);
     }
 

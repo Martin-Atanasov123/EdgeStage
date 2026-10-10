@@ -48,7 +48,7 @@
                 element, so its content (the large icon) is only visible when no thumbnail is
                 drawn: preview unavailable, or DWM has nothing for the window.
             -->
-            <Border x:Name="ThumbHost" Grid.Row="2" CornerRadius="4" Background="{StaticResource ThumbPlaceholderBrush}">
+            <Border x:Name="ThumbHost" Grid.Row="2" CornerRadius="6" Background="Transparent">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     <Image Width="40" Height="40" Opacity="0.6" Source="{Binding Icon}"
                            Visibility="{Binding Icon, Converter={StaticResource NullToCollapsed}}" />

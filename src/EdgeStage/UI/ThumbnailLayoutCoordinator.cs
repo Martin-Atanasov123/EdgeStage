@@ -19,12 +19,15 @@ internal sealed class ThumbnailLayoutCoordinator
     private readonly ItemsControl _items;
     private readonly ScrollViewer _scroll;
     private readonly Dictionary<CardViewModel, ThumbnailRegistration> _registrations = [];
+    private readonly CornerMaskWindow _mask;
+    private readonly List<CornerMaskWindow.Item> _maskItems = [];
 
-    public ThumbnailLayoutCoordinator(Window window, ItemsControl items, ScrollViewer scroll)
+    public ThumbnailLayoutCoordinator(Window window, ItemsControl items, ScrollViewer scroll, CornerMaskWindow mask)
     {
         _window = window;
         _items = items;
         _scroll = scroll;
+        _mask = mask;
     }
 
     /// <summary>Raised when DWM reports a card's source window gone (backstop for missed destroy events).</summary>
@@ -71,6 +74,7 @@ internal sealed class ThumbnailLayoutCoordinator
             .Intersect(new PixelRect(0, 0, _window.ActualWidth, _window.ActualHeight).Scale(scale));
 
         List<CardViewModel>? lost = null;
+        _maskItems.Clear();
         foreach (var (card, registration) in _registrations)
         {
             ThumbnailPlacement placement = ThumbnailPlacement.Hidden;
@@ -81,7 +85,14 @@ internal sealed class ThumbnailLayoutCoordinator
             }
             if (!registration.Apply(placement, Opacity))
                 (lost ??= []).Add(card);
+            else if (placement.IsVisible)
+                // A preview cut by the scroll viewport keeps square corners on the cut edge.
+                _maskItems.Add(new CornerMaskWindow.Item(placement.Destination,
+                    RoundTop: placement.Source.Top <= 1,
+                    RoundBottom: placement.Source.Bottom >= registration.SourceSize.Height - 1,
+                    Highlighted: card.IsSelected));
         }
+        _mask.Apply(_maskItems, scale, Opacity / 255.0);
 
         if (lost is not null)
             foreach (CardViewModel card in lost)
@@ -122,6 +133,7 @@ internal sealed class ThumbnailLayoutCoordinator
 
     public void ReleaseAll()
     {
+        _mask.HideMask();
         foreach (ThumbnailRegistration registration in _registrations.Values)
             registration.Dispose();
         _registrations.Clear();
