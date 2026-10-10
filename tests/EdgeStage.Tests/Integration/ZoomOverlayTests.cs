@@ -60,7 +60,7 @@ public sealed class ZoomOverlayTests
 
         Assert.IsFalse(overlay.IsVisible, "overlay must hide itself");
         Assert.AreEqual(liveBefore, DwmThumbnailService.LiveRegistrations, "the overlay thumbnail must be released");
-        Assert.IsTrue(started.ElapsedMilliseconds >= 330, $"grow + fade should take at least ~390 ms, took {started.ElapsedMilliseconds} ms");
+        Assert.IsTrue(started.ElapsedMilliseconds >= 250, $"grow + fade should take at least ~290 ms, took {started.ElapsedMilliseconds} ms");
 
         overlay.Close();
         target.Close();

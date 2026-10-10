@@ -20,8 +20,8 @@ namespace EdgeStage.UI;
 /// </summary>
 internal sealed class ZoomOverlay : Window
 {
-    private const double GrowMs = 280;
-    private const double FadeMs = 110;
+    private const double GrowMs = 200;
+    private const double FadeMs = 90;
 
     private readonly nint _hwnd;
 
