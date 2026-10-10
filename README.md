@@ -5,6 +5,8 @@ pointer at the left (or right) edge of the screen, or press a shortcut, and a si
 previews** of your open windows slides in. Click a preview, or use the arrow keys and Enter, to
 switch to that window.
 
+**[Download the latest release](https://github.com/Martin-Atanasov123/EdgeStage/releases/latest)** · [Changelog](CHANGELOG.md) · [Test report](docs/TESTING.md)
+
 <p>
   <img src="docs/images/sidebar.png" alt="EdgeStage sidebar with live previews of test windows" height="420">
   &nbsp;

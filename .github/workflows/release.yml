@@ -39,9 +39,10 @@ jobs:
             Copy-Item "artifacts/$kind/EdgeStage.exe", README.md, LICENSE, CHANGELOG.md $stage
             Compress-Archive -Path "$stage/*" -DestinationPath "dist/EdgeStage-$v-win-x64-$name.zip"
           }
-          Get-ChildItem dist/*.zip | Get-FileHash -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
-            Set-Content dist/SHA256SUMS.txt
+          $lines = Get-ChildItem dist/*.zip | Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" }
+          # LF line endings so `sha256sum -c` works as well as PowerShell
+          [IO.File]::WriteAllText("dist/SHA256SUMS.txt", ($lines -join "`n") + "`n")
 
       - name: Create or update release
         shell: pwsh
