@@ -42,6 +42,24 @@ public static class WindowQuery
         return pid;
     }
 
+    /// <summary>
+    /// Top of the owner chain (the window itself when unowned). Walks GW_OWNER explicitly:
+    /// GetAncestor(GA_ROOTOWNER) follows GetParent, which only reports the owner of WS_POPUP
+    /// windows, so it misses owned overlapped windows such as WPF/WinForms dialogs.
+    /// </summary>
+    public static nint GetRootOwner(nint hwnd)
+    {
+        nint current = hwnd;
+        for (int depth = 0; depth < 64; depth++)
+        {
+            nint owner = User32.GetWindow(current, GW_OWNER);
+            if (owner == 0 || owner == current)
+                break;
+            current = owner;
+        }
+        return current;
+    }
+
     public static long GetStyle(nint hwnd) => User32.GetWindowLongPtr(hwnd, GWL_STYLE);
 
     public static long GetExStyle(nint hwnd) => User32.GetWindowLongPtr(hwnd, GWL_EXSTYLE);

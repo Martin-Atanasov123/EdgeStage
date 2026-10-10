@@ -62,6 +62,13 @@ public static partial class User32
     public static nint SetWindowLongPtr(nint hWnd, int nIndex, nint value) =>
         nint.Size == 8 ? SetWindowLongPtr64(hWnd, nIndex, value) : SetWindowLong32(hWnd, nIndex, (int)value);
 
+    [LibraryImport(Lib, EntryPoint = "FindWindowExW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial nint FindWindowEx(nint hWndParent, nint hWndChildAfter, string? lpszClass, string? lpszWindow);
+
+    [LibraryImport(Lib)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsWindowEnabled(nint hWnd);
+
     [LibraryImport(Lib)]
     public static partial nint GetAncestor(nint hWnd, uint gaFlags);
 

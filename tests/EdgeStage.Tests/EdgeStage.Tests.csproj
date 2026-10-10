@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseVSTest>true</UseVSTest>
+    <!-- Desktop integration tests create real WPF windows. -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
 
   <ItemGroup>
