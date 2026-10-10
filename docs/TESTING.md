@@ -24,7 +24,7 @@ check that needs a real keyboard or mouse is marked PARTIAL or NOT RUN, and list
 (`EDGESTAGE_TEST_ONLY_PROCESS`) limited the sidebar to synthetic test windows. Checks against the
 user's real windows recorded aggregate pixel statistics only.
 
-## 1. Automated tests — 177 PASS
+## 1. Automated tests — 179 PASS, 1 inconclusive
 
 ```bash
 dotnet test EdgeStage.slnx -c Release
@@ -69,6 +69,8 @@ use DEBUG-only hooks to open the sidebar and to trigger "activate selected card"
 | Changing title | PASS | card label changed between frames ("step 13" → "step 18") |
 | Window without icon | PASS | generic glyph shown |
 | Settings window, conflict notice, tray menu rendering | PASS | screenshots in `docs/images/` (tray menu opened by a DEBUG hook at a fixed position) |
+| Zoom transition runs to completion, hides itself, releases its thumbnail | PASS | integration test `ZoomOverlayTests` (≥330 ms; 20 frames / 286 ms grow and 9 frames / 123 ms fade measured in the app) |
+| Zoom ends with the target window in front | NOT RUN | in the scripted runs Windows refused foreground activation (the user was working in another app, no real input); the refusal path (tray notice, overlay still hides) was exercised |
 | Exit via `--exit` while sidebar open | PASS | exit code 0, "live DWM thumbnail registrations: 0" |
 | Second launch shows the running instance's sidebar | PASS | log "Sidebar opened" after relaunch with `--show`; single process |
 | Published self-contained exe starts, shows, exits | PASS | smoke run of `artifacts\SelfContained\EdgeStage.exe` |
