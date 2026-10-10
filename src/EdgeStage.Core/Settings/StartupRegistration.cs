@@ -89,11 +89,20 @@ public sealed class StartupRegistration
     }
 }
 
-/// <summary>The real HKCU implementation.</summary>
+/// <summary>The real HKCU implementation. Key paths are injectable so tests can use a scratch key.</summary>
 public sealed class WindowsStartupRegistry : IStartupRegistry
 {
-    private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ApprovedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+    public const string DefaultRunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    public const string DefaultApprovedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+
+    private readonly string RunKey;
+    private readonly string ApprovedKey;
+
+    public WindowsStartupRegistry(string runKey = DefaultRunKey, string approvedKey = DefaultApprovedKey)
+    {
+        RunKey = runKey;
+        ApprovedKey = approvedKey;
+    }
 
     public string? GetRunValue(string name)
     {

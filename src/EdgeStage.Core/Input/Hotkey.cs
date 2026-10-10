@@ -32,14 +32,17 @@ public readonly record struct Hotkey(HotkeyModifiers Modifiers, int VirtualKey)
         && !IsModifierKey(VirtualKey)
         && (Modifiers != HotkeyModifiers.None || VirtualKey is >= 0x7C and <= 0x87);
 
-    public override string ToString()
+    public override string ToString() =>
+        FormatModifiers(Modifiers) + (Names.TryGetValue(VirtualKey, out string? name) ? name : $"0x{VirtualKey:X2}");
+
+    /// <summary>"Ctrl+Alt+" style prefix in canonical order (Ctrl, Alt, Shift, Win).</summary>
+    public static string FormatModifiers(HotkeyModifiers modifiers)
     {
         var sb = new StringBuilder();
-        if (Modifiers.HasFlag(HotkeyModifiers.Control)) sb.Append("Ctrl+");
-        if (Modifiers.HasFlag(HotkeyModifiers.Alt)) sb.Append("Alt+");
-        if (Modifiers.HasFlag(HotkeyModifiers.Shift)) sb.Append("Shift+");
-        if (Modifiers.HasFlag(HotkeyModifiers.Win)) sb.Append("Win+");
-        sb.Append(Names.TryGetValue(VirtualKey, out string? name) ? name : $"0x{VirtualKey:X2}");
+        if (modifiers.HasFlag(HotkeyModifiers.Control)) sb.Append("Ctrl+");
+        if (modifiers.HasFlag(HotkeyModifiers.Alt)) sb.Append("Alt+");
+        if (modifiers.HasFlag(HotkeyModifiers.Shift)) sb.Append("Shift+");
+        if (modifiers.HasFlag(HotkeyModifiers.Win)) sb.Append("Win+");
         return sb.ToString();
     }
 

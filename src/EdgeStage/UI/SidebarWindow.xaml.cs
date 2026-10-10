@@ -1,7 +1,9 @@
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 using EdgeStage.Core.Activation;
 using EdgeStage.Core.Diagnostics;
@@ -33,6 +35,13 @@ public partial class SidebarWindow : Window
         SidebarViewModel.ListPadding, SidebarViewModel.ListPadding,
         SidebarViewModel.ListPadding, SidebarViewModel.ListPadding - SidebarViewModel.CardSpacing);
 
+    private const double ShowDurationMs = 180;
+    private const double HideDurationMs = 140;
+    private const double SlideDistanceDip = 24;
+
+    /// <summary>Room around the panel (except on the screen-edge side) for the soft shadow.</summary>
+    private const double ShadowDip = 10;
+
     private static readonly TimeSpan PointerInterval = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan SourceSizeInterval = TimeSpan.FromMilliseconds(500);
 
@@ -51,6 +60,12 @@ public partial class SidebarWindow : Window
     private bool _pointerEntered;
     private long _outsideSinceMs = -1;
     private bool _activating;
+
+    private readonly Stopwatch _animationClock = new();
+    private bool _animating;
+    private bool _animatingIn;
+    private bool _hiding;
+    private int _animationFrames;
 
     public SidebarWindow(WindowTracker tracker)
     {
@@ -97,6 +112,8 @@ public partial class SidebarWindow : Window
     {
         if (IsOpen)
             return;
+        if (_hiding)
+            FinishHide(); // reopened during the hide animation
 
         Mode = mode;
         _monitor = monitor;
@@ -122,9 +139,12 @@ public partial class SidebarWindow : Window
         _tracker.WindowEvent += OnWindowEvent;
         _tracker.BeginDetailedTracking();
 
-        // Shown transparent first; revealed together with the thumbnails once layout has run, so
-        // cards never appear without their previews.
-        Opacity = 0;
+        // Shown fully transparent first; the reveal animation starts once layout has run and the
+        // thumbnails are registered, so cards never appear without their previews.
+        Root.Opacity = 0;
+        Slide.X = SlideOffset(1.0);
+        _thumbs.Opacity = 0;
+        IsHitTestVisible = true;
         ShowActivated = mode == SidebarOpenMode.Hotkey;
         Show();
         IsOpen = true;
@@ -140,9 +160,9 @@ public partial class SidebarWindow : Window
                 return;
             _thumbs.Sync(_vm.Cards, _hwnd);
             UpdateLayout();
-            _thumbs.Update();
-            Opacity = 1;
             ScrollSelectedIntoView();
+            _thumbs.Update();
+            StartAnimation(show: true);
             Log.Info($"Sidebar opened ({mode}) on monitor {monitor.Bounds} @ {monitor.Dpi} dpi: " +
                      $"{_vm.Cards.Count} windows, {_thumbs.Count} live thumbnails.");
         });
@@ -153,7 +173,11 @@ public partial class SidebarWindow : Window
         _sourceSizeTimer.Start();
     }
 
-    public void Dismiss(string reason)
+    /// <summary>
+    /// Closes the sidebar. Window hooks and timers stop at once; the short fade-out runs only after
+    /// any window switch has already happened, so animation never delays the switch.
+    /// </summary>
+    public void Dismiss(string reason, bool immediate = false)
     {
         if (!IsOpen)
             return;
@@ -163,12 +187,80 @@ public partial class SidebarWindow : Window
         _sourceSizeTimer.Stop();
         _tracker.WindowEvent -= OnWindowEvent;
         _tracker.EndDetailedTracking();
-        _thumbs.ReleaseAll();
-        Hide();
-        _vm.Clear();
+        IsHitTestVisible = false;
 
         Log.Info($"Sidebar dismissed: {reason}.");
         Dismissed?.Invoke(reason);
+
+        _hiding = true;
+        if (immediate || !IsVisible)
+            FinishHide();
+        else
+            StartAnimation(show: false);
+    }
+
+    private void FinishHide()
+    {
+        StopAnimation();
+        _hiding = false;
+        _thumbs.ReleaseAll();
+        Hide();
+        _vm.Clear();
+        Root.Opacity = 0;
+    }
+
+    // ---- animation ---------------------------------------------------------------------------------
+
+    /// <summary>Offset of the sliding panel: 0 at rest, SlideDistance toward the screen edge when hidden.</summary>
+    private double SlideOffset(double hiddenFraction) =>
+        (_edge == ScreenEdge.Left ? -1 : 1) * SlideDistanceDip * hiddenFraction;
+
+    private void StartAnimation(bool show)
+    {
+        _animatingIn = show;
+        _animationFrames = 0;
+        _animationClock.Restart();
+        if (!_animating)
+        {
+            _animating = true;
+            CompositionTarget.Rendering += OnAnimationFrame;
+        }
+    }
+
+    private void StopAnimation()
+    {
+        if (!_animating)
+            return;
+        _animating = false;
+        CompositionTarget.Rendering -= OnAnimationFrame;
+        _animationClock.Stop();
+    }
+
+    /// <summary>
+    /// One frame. The WPF panel (slide + opacity) and the DWM thumbnails (rect + opacity) are
+    /// updated together; DWM thumbnails ignore WPF opacity, so they are faded explicitly.
+    /// </summary>
+    private void OnAnimationFrame(object? sender, EventArgs e)
+    {
+        double duration = _animatingIn ? ShowDurationMs : HideDurationMs;
+        double elapsed = _animationClock.Elapsed.TotalMilliseconds;
+        double t = Math.Clamp(elapsed / duration, 0, 1);
+        _animationFrames++;
+        double visible = _animatingIn
+            ? 1 - Math.Pow(1 - t, 3)   // ease-out cubic: fast start, gentle landing
+            : 1 - t * t;               // ease-in quadratic: leaves quickly
+
+        Root.Opacity = visible;
+        Slide.X = SlideOffset(1 - visible);
+        _thumbs.Opacity = (byte)Math.Round(255 * visible);
+        _thumbs.Update();
+
+        if (t < 1)
+            return;
+        StopAnimation();
+        Log.Info($"{(_animatingIn ? "Show" : "Hide")} animation: {_animationFrames} frames in {elapsed:F0} ms.");
+        if (!_animatingIn)
+            FinishHide();
     }
 
     // ---- placement -------------------------------------------------------------------------------
@@ -177,11 +269,33 @@ public partial class SidebarWindow : Window
     {
         if (_monitor is null)
             return;
-        RECT r = SidebarPlacement.Compute(_monitor, _edge, _vm.ContentHeightDip);
+        double scale = _monitor.Scale;
+        RECT panel = SidebarPlacement.Compute(_monitor, _edge, _vm.ContentHeightDip);
+        int shadow = (int)Math.Round(ShadowDip * scale);
+        RECT work = _monitor.WorkArea;
+
+        // The window covers the gap to the screen edge (so the panel can slide in from it) and a
+        // little room on the other sides for the shadow.
+        RECT window = _edge == ScreenEdge.Left
+            ? new RECT(work.Left, panel.Top - shadow, panel.Right + shadow, panel.Bottom + shadow)
+            : new RECT(panel.Left - shadow, panel.Top - shadow, work.Right, panel.Bottom + shadow);
+
+        var margin = new Thickness(
+            (panel.Left - window.Left) / scale, (panel.Top - window.Top) / scale,
+            (window.Right - panel.Right) / scale, (window.Bottom - panel.Bottom) / scale);
+        Panel.Margin = margin;
+        Shadow1.Margin = Grow(margin, 3, 2);
+        Shadow2.Margin = Grow(margin, 6, 3);
+        Shadow3.Margin = Grow(margin, 9, 4);
+
         // Physical pixels via SetWindowPos: unambiguous on mixed-DPI monitor setups.
-        User32.SetWindowPos(_hwnd, HWND_TOPMOST, r.Left, r.Top, r.Width, r.Height, SWP_NOACTIVATE);
-        _keepOpen = SidebarPlacement.KeepOpenRegion(r, _edge, _monitor);
+        User32.SetWindowPos(_hwnd, HWND_TOPMOST, window.Left, window.Top, window.Width, window.Height, SWP_NOACTIVATE);
+        _keepOpen = SidebarPlacement.KeepOpenRegion(panel, _edge, _monitor);
     }
+
+    /// <summary>Margin for a shadow layer <paramref name="spread"/> DIPs larger than the panel, shifted down by <paramref name="drop"/>.</summary>
+    private static Thickness Grow(Thickness m, double spread, double drop) =>
+        new(m.Left - spread, m.Top - spread + drop, m.Right - spread, m.Bottom - spread - drop);
 
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
     {

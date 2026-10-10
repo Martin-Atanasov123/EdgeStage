@@ -53,6 +53,14 @@ public partial class App : Application
                 return;
             }
 
+            if (args.Length >= 6 && args[0] == "--capture-rect")
+            {
+                // --capture-rect <x> <y> <width> <height> <out prefix>
+                File.WriteAllText(args[5] + ".txt", Capture.Rect(int.Parse(args[1]), int.Parse(args[2]), int.Parse(args[3]), int.Parse(args[4]), args[5]));
+                Shutdown(0);
+                return;
+            }
+
             if (args.Length >= 5 && args[0] == "--backdrop")
             {
                 // --backdrop <left> <top> <width> <height>: opaque neutral surface so screenshots of

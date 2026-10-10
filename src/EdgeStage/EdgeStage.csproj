@@ -7,7 +7,17 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>EdgeStage</AssemblyName>
     <RootNamespace>EdgeStage</RootNamespace>
+    <ApplicationIcon>Assets\EdgeStage.ico</ApplicationIcon>
+    <Description>Stage Manager-style window switcher sidebar for Windows</Description>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\EdgeStage.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EdgeStage.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\EdgeStage.Core\EdgeStage.Core.csproj" />

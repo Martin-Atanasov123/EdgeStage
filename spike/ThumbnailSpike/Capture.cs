@@ -25,7 +25,7 @@ internal static class Capture
             return $"window '{title}' not found or not visible";
 
         User32.GetWindowRect(hwnd, out RECT r);
-        var area = new RECT(Math.Max(0, r.Left - 16), Math.Max(0, r.Top - 16), r.Right + 16, r.Bottom + 16);
+        var area = r; // exactly the window: nothing of other windows behind it
         log.AppendLine($"window rect {r}, capture {area}");
         for (int f = 0; f < frames; f++)
         {
@@ -36,6 +36,14 @@ internal static class Capture
             if (f < frames - 1) await Task.Delay(intervalMs);
         }
         return log.ToString();
+    }
+
+    public static string Rect(int x, int y, int width, int height, string outPrefix)
+    {
+        var area = new RECT(x, y, x + width, y + height);
+        string path = $"{outPrefix}-0.png";
+        Save(ScreenProbe.Capture(area), width, height, path);
+        return $"rect {area}\n{path}";
     }
 
     private static void Save(byte[] bgra, int width, int height, string path)

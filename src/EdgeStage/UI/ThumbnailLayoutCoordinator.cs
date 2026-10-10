@@ -67,7 +67,8 @@ internal sealed class ThumbnailLayoutCoordinator
             return;
 
         double scale = VisualTreeHelper.GetDpi(_window).DpiScaleX;
-        PixelRect viewport = ToDevice(_scroll, new Rect(0, 0, _scroll.ViewportWidth, _scroll.ViewportHeight), scale);
+        PixelRect viewport = ToDevice(_scroll, new Rect(0, 0, _scroll.ViewportWidth, _scroll.ViewportHeight), scale)
+            .Intersect(new PixelRect(0, 0, _window.ActualWidth, _window.ActualHeight).Scale(scale));
 
         List<CardViewModel>? lost = null;
         foreach (var (card, registration) in _registrations)

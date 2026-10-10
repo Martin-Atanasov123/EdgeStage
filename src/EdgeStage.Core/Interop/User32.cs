@@ -96,6 +96,10 @@ public static partial class User32
     [LibraryImport(Lib)]
     public static partial uint GetDpiForWindow(nint hWnd);
 
+    /// <summary>System DPI (the primary monitor's DPI at sign-in); the taskbar's notification area uses it.</summary>
+    [LibraryImport(Lib)]
+    public static partial uint GetDpiForSystem();
+
     // ---- Activation and placement ------------------------------------------------------------
 
     [LibraryImport(Lib)]

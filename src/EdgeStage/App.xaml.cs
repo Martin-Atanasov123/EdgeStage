@@ -33,9 +33,14 @@ public partial class App : Application
         }
 
 #if DEBUG
-        if (HasArg("--test-activate-selected") || HasArg("--test-show-edge"))
+        uint? testMessage = HasArg("--test-show-edge") ? SingleInstance.TestShowEdgeMessage
+            : HasArg("--test-activate-selected") ? SingleInstance.TestActivateSelectedMessage
+            : HasArg("--test-open-settings") ? SingleInstance.TestOpenSettingsMessage
+            : HasArg("--test-tray-menu") ? SingleInstance.TestTrayMenuMessage
+            : null;
+        if (testMessage is uint message)
         {
-            SingleInstance.Signal(HasArg("--test-show-edge") ? SingleInstance.TestShowEdgeMessage : SingleInstance.TestActivateSelectedMessage);
+            SingleInstance.Signal(message);
             Shutdown(0);
             return;
         }
@@ -49,32 +54,25 @@ public partial class App : Application
         }
 
         Log.Initialize(AppInfo.LogDirectory);
+        // Optional diagnostics: EDGESTAGE_LOG_LEVEL=Debug writes detailed traces to the same log.
+        if (Enum.TryParse(Environment.GetEnvironmentVariable("EDGESTAGE_LOG_LEVEL"), ignoreCase: true, out LogLevel level))
+            Log.MinimumLevel = level;
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += (_, args) => Log.Error("Unhandled exception", args.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, args) => { Log.Error("Unobserved task exception", args.Exception); args.SetObserved(); };
 
-        _controller = new EdgeStageController(SettingsStore.ForCurrentUser());
+        SystemAccent.Apply(Resources);
+
+        _controller = new EdgeStageController(SettingsStore.ForCurrentUser(), StartupRegistration.ForCurrentUser());
         _controller.ExitRequested += () =>
         {
-            _controller.HideSidebar("exit");
+            _controller.HideSidebar("exit", immediate: true);
             Shutdown(0);
         };
-        _controller.HotkeyRegistrationFailed += OnHotkeyRegistrationFailed;
-        _controller.Start();
+        _controller.Start(autostart: HasArg("--autostart"));
 
         if (HasArg("--show"))
             _controller.ShowSidebar(SidebarOpenMode.Hotkey);
-    }
-
-    private static void OnHotkeyRegistrationFailed(Hotkey hotkey, HotkeyRegistrationResult result)
-    {
-        string reason = result.Status == HotkeyRegistrationStatus.Conflict
-            ? "another application is already using it"
-            : $"Windows rejected it (error {result.Win32Error})";
-        new NoticeWindow(
-            $"Shortcut {hotkey} is not available",
-            $"It could not be registered because {reason}. EdgeStage is still running and opens from the " +
-            "screen edge. Choose a different shortcut in EdgeStage settings.").Show();
     }
 
     private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

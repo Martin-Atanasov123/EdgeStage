@@ -20,6 +20,12 @@ internal static class SingleInstance
 
     /// <summary>DEBUG only: opens the sidebar exactly as the edge trigger does, without moving the cursor.</summary>
     public static uint TestShowEdgeMessage { get; } = User32.RegisterWindowMessage("EdgeStage.Test.ShowEdge.v1");
+
+    /// <summary>DEBUG only: opens the settings window (for screenshots).</summary>
+    public static uint TestOpenSettingsMessage { get; } = User32.RegisterWindowMessage("EdgeStage.Test.OpenSettings.v1");
+
+    /// <summary>DEBUG only: opens the tray menu at a fixed position (for screenshots).</summary>
+    public static uint TestTrayMenuMessage { get; } = User32.RegisterWindowMessage("EdgeStage.Test.TrayMenu.v1");
 #endif
 
     public static bool TryAcquire()

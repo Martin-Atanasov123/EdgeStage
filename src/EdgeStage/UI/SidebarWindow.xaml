@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:EdgeStage.UI"
-        Title="EdgeStage"
+        Title="EdgeStage Sidebar"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -18,29 +18,43 @@
         AllowsTransparency (a per-pixel-alpha layered window) was chosen in the Phase 1 spike: DWM
         thumbnails render on it exactly, and its translucent charcoal looks identical whether or not
         the sidebar is the active window (the system Acrylic backdrop turns opaque grey when inactive).
-    -->
-    <Border x:Name="Panel" CornerRadius="14" BorderThickness="1"
-            Background="{StaticResource SidebarBackgroundBrush}"
-            BorderBrush="{StaticResource SidebarBorderBrush}">
-        <Grid>
-            <ScrollViewer x:Name="Scroller" Style="{StaticResource SlimScrollViewer}"
-                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                          CanContentScroll="False" Focusable="False">
-                <ItemsControl x:Name="CardList" ItemsSource="{Binding Cards}" Focusable="False"
-                              Margin="{x:Static ui:SidebarWindow.ListMargin}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <ui:PreviewCard Margin="0,0,0,8"
-                                            MouseEnter="OnCardMouseEnter"
-                                            MouseLeftButtonUp="OnCardClicked" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
 
-            <TextBlock x:Name="EmptyText" Text="No other open windows" FontSize="13"
-                       Foreground="{StaticResource SecondaryTextBrush}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-        </Grid>
-    </Border>
+        The window spans from the screen edge to just past the panel, so the panel can slide in from
+        the edge. Fully transparent pixels of a layered window do not receive clicks.
+    -->
+    <Grid x:Name="Root" Opacity="0">
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="Slide" />
+        </Grid.RenderTransform>
+
+        <!-- Soft shadow: three faint, static rounded layers (no blur effect, so nothing to re-rasterize per frame). -->
+        <Border x:Name="Shadow3" CornerRadius="23" Background="#0B000000" IsHitTestVisible="False" />
+        <Border x:Name="Shadow2" CornerRadius="20" Background="#10000000" IsHitTestVisible="False" />
+        <Border x:Name="Shadow1" CornerRadius="17" Background="#1A000000" IsHitTestVisible="False" />
+
+        <Border x:Name="Panel" CornerRadius="14" BorderThickness="1"
+                Background="{StaticResource SidebarBackgroundBrush}"
+                BorderBrush="{StaticResource SidebarBorderBrush}">
+            <Grid>
+                <ScrollViewer x:Name="Scroller" Style="{StaticResource SlimScrollViewer}"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="False" Focusable="False">
+                    <ItemsControl x:Name="CardList" ItemsSource="{Binding Cards}" Focusable="False"
+                                  Margin="{x:Static ui:SidebarWindow.ListMargin}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ui:PreviewCard Margin="0,0,0,8"
+                                                MouseEnter="OnCardMouseEnter"
+                                                MouseLeftButtonUp="OnCardClicked" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <TextBlock x:Name="EmptyText" Text="No other open windows" FontSize="13"
+                           Foreground="{StaticResource SecondaryTextBrush}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+            </Grid>
+        </Border>
+    </Grid>
 </Window>
