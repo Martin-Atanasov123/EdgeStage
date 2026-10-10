@@ -20,7 +20,7 @@ public partial class App : Application
 
         try
         {
-            if (args.Length >= 3 && args[0] is "--source" or "--source-flip" or "--source-min")
+            if (args.Length >= 3 && args[0] is "--source" or "--source-flip" or "--source-min" or "--source-retitle")
             {
                 var color = (Color)ColorConverter.ConvertFromString(args[2]);
                 var window = new SourceWindow(args[1], color, 900, 500);
@@ -33,6 +33,14 @@ public partial class App : Application
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
                     bool flip = false;
                     timer.Tick += (_, _) => window.SetColor((flip = !flip) ? other : color);
+                    timer.Start();
+                }
+                else if (args[0] == "--source-retitle")
+                {
+                    // Title that keeps changing (like a terminal or a browser tab) and grows very long.
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+                    int step = 0;
+                    timer.Tick += (_, _) => window.Title = $"{args[1]} — step {++step} — " + new string('x', 20 * (step % 4));
                     timer.Start();
                 }
                 else if (args[0] == "--source-min")

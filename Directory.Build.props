@@ -11,4 +11,10 @@
     <Version>1.0.0</Version>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <!-- Release: symbols embedded in each assembly (no loose .pdb files to ship, but logged
+       exception stack traces still carry file and line numbers). -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
 </Project>
