@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/spike/">
+    <Project Path="spike/ThumbnailSpike/ThumbnailSpike.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/EdgeStage.Core/EdgeStage.Core.csproj" />
+    <Project Path="src/EdgeStage/EdgeStage.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EdgeStage.Tests/EdgeStage.Tests.csproj" />
+  </Folder>
+</Solution>

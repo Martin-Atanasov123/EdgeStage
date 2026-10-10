@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Phase 1 proof of concept: DWM live thumbnails hosted in a WPF window. Kept for reference. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>..\..\src\EdgeStage\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EdgeStage.Core\EdgeStage.Core.csproj" />
+  </ItemGroup>
+
+</Project>
