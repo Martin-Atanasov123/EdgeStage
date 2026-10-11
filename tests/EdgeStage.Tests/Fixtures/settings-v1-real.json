@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "edge": "Left",
+  "edgeActivationEnabled": true,
+  "activationDelayMs": 300,
+  "dismissDelayMs": 400,
+  "hotkey": "Ctrl+Alt+Space",
+  "firstRunTipShown": true
+}
