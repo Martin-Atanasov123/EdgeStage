@@ -505,6 +505,10 @@ public partial class SidebarWindow : Window
                 _vm.SelectedIndex = _vm.Cards.Count - 1;
                 ScrollSelectedIntoView();
                 break;
+            case Key.W when Keyboard.Modifiers == ModifierKeys.Control:
+                if (_vm.Selected is { } toClose)
+                    WindowActions.RequestClose(toClose); // Ctrl+W: close the selected window
+                break;
             case Key.Space when _vm.HasFilter:
                 return; // part of the filter text; handled in PreviewTextInput
             case Key.Enter or Key.Space:

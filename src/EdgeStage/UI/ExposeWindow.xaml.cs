@@ -230,12 +230,12 @@ public partial class ExposeWindow : Window
     }
 
     /// <summary>Closes Exposé and returns to the window that was active before it opened.</summary>
-    public void Dismiss(string reason, bool immediate = false)
+    public void Dismiss(string reason, bool immediate = false, bool returnToPrevious = true)
     {
         if (!IsOpen)
             return;
         nint previous = _previous;
-        bool canReturn = previous != 0 && User32.IsWindow(previous) && previous != _hwnd;
+        bool canReturn = returnToPrevious && previous != 0 && User32.IsWindow(previous) && previous != _hwnd;
         // Closing state first: activating the previous window deactivates this one synchronously.
         BeginClose(reason, immediate, target: null);
         if (canReturn)
@@ -582,6 +582,16 @@ public partial class ExposeWindow : Window
             case Key.End:
                 _vm.SelectedIndex = _vm.Cards.Count - 1;
                 ScrollSelectedIntoView();
+                break;
+            case Key.W when Keyboard.Modifiers == ModifierKeys.Control:
+                if (_vm.Selected is { } toClose)
+                    WindowActions.RequestClose(toClose); // Ctrl+W: close the selected window
+                break;
+            case Key.PageDown:
+                Navigate(NavDirection.Down);
+                break;
+            case Key.PageUp:
+                Navigate(NavDirection.Up);
                 break;
             case Key.Space when _vm.HasFilter:
                 return; // part of the search text; handled in PreviewTextInput

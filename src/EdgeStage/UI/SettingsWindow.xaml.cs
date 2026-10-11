@@ -15,6 +15,13 @@ using EdgeStage.Core.Settings;
 namespace EdgeStage.UI;
 
 /// <summary>What the settings window needs from the application; implemented by the controller.</summary>
+/// <summary>Sections the settings window can be opened at.</summary>
+internal enum SettingsPage
+{
+    General,
+    HiddenApps,
+}
+
 internal interface ISettingsHost
 {
     AppSettings Settings { get; }
@@ -90,6 +97,13 @@ internal partial class SettingsWindow : Window
             HoldToSwitch = HoldToSwitch.IsChecked == true,
             OnlyPointerMonitor = OnlyMonitor.IsChecked == true,
         });
+    }
+
+    /// <summary>Scrolls to the requested section.</summary>
+    public void ShowPage(SettingsPage page)
+    {
+        if (page == SettingsPage.HiddenApps)
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => HiddenAppsHint.BringIntoView());
     }
 
     private void RefreshHiddenApps()

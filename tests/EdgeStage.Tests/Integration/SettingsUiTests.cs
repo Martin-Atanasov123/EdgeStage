@@ -23,6 +23,9 @@ internal sealed class FakeHost : ITrayActions, ISettingsHost
     public Func<Hotkey, HotkeyRegistrationResult> Probe { get; set; } = _ => new(HotkeyRegistrationStatus.Registered);
 
     public void ShowSidebar() => Calls.Add("show");
+    public void ShowExpose() => Calls.Add("expose");
+    public void OpenHiddenApps() => Calls.Add("hidden-apps");
+    public bool ExposeHotkeyAvailable { get; set; } = true;
     public void OpenSettings() => Calls.Add("settings");
     public void Exit() => Calls.Add("exit");
     public void SuspendHotkey() => Calls.Add("suspend");
@@ -104,7 +107,7 @@ public sealed class SettingsUiTests
         Assert.IsTrue(Find(position, "Right").IsChecked);
         Assert.IsTrue(Find(Find(menu, "Activation delay"), "500 ms").IsChecked);
 
-        Click(Find(menu, "Show sidebar"));
+        Click(Find(menu, "Open sidebar"));
         Click(Find(menu, "Edge activation"));
         Click(Find(position, "Left"));
         Click(Find(Find(menu, "Activation delay"), "150 ms"));
@@ -117,6 +120,25 @@ public sealed class SettingsUiTests
         Assert.AreEqual(150, host.Settings.ActivationDelayMs);
         Assert.AreEqual(StartupState.Disabled, host.StartupState);
         CollectionAssert.IsSubsetOf(new[] { "show", "startup:False", "settings", "exit" }, host.Calls);
+    }
+
+    [STATestMethod]
+    public void TrayMenu_OffersExposeAndHiddenApps_WithShortcutHints()
+    {
+        EnsureApplicationResources();
+        var host = new FakeHost { ExposeHotkeyAvailable = true };
+
+        ContextMenu menu = TrayMenu.Build(host);
+        MenuItem expose = Find(menu, "Open Exposé");
+
+        Assert.AreEqual("Ctrl+Alt+Up", expose.InputGestureText);
+        Assert.AreEqual("Ctrl+Alt+Space", Find(menu, "Open sidebar").InputGestureText);
+        Click(expose);
+        Click(Find(menu, "Hidden apps"));
+        CollectionAssert.AreEqual(new[] { "expose", "hidden-apps" }, host.Calls);
+
+        host.ExposeHotkeyAvailable = false;
+        Assert.AreEqual("", Find(TrayMenu.Build(host), "Open Exposé").InputGestureText, "no hint for a shortcut that does not work");
     }
 
     [STATestMethod]

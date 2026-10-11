@@ -13,6 +13,8 @@ public enum HotkeyRegistrationStatus
     /// <summary>The combination is not usable as a global shortcut.</summary>
     Invalid,
     Failed,
+    /// <summary>The same combination is already used by EdgeStage's other shortcut.</summary>
+    Duplicate,
 }
 
 public readonly record struct HotkeyRegistrationResult(HotkeyRegistrationStatus Status, int Win32Error = 0)

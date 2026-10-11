@@ -22,9 +22,11 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
 {
     public const int SidebarHotkeyId = 1;
     public const int EscapeHotkeyId = 2;
+    public const int ExposeHotkeyId = 3;
 
     /// <summary>Offered (in this order) when the configured shortcut is taken; the first free one is suggested.</summary>
     private static readonly string[] FallbackHotkeys = ["Alt+`", "Ctrl+Shift+Space", "Ctrl+Alt+S", "Ctrl+Alt+Q", "Ctrl+Shift+`"];
+    private static readonly string[] FallbackExposeHotkeys = ["Ctrl+Alt+Down", "Ctrl+Shift+Up", "Ctrl+Alt+Tab", "Alt+Shift+`", "Ctrl+Alt+F1"];
 
     private readonly Dispatcher _dispatcher;
     private readonly SettingsStore _store;
@@ -99,6 +101,8 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
 
     public HotkeyRegistrationResult HotkeyStatus { get; private set; }
 
+    public HotkeyRegistrationResult ExposeHotkeyStatus { get; private set; }
+
     /// <summary>Set when settings had to be reset; shown once at startup.</summary>
     public string? LoadWarning { get; }
 
@@ -111,6 +115,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         LogEnvironment();
         _tracker.Start();
         ApplyHotkey();
+        ApplyExposeHotkey();
         _edge.Configure(Settings.EdgeActivationEnabled, Settings.Edge, Settings.ActivationDelayMs, Settings.EdgeInFullscreen);
         _sidebar.ApplySettings(Settings);
         _expose.ApplySettings(Settings);
@@ -120,9 +125,12 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
 
         if (!HotkeyStatus.Succeeded)
             ReportHotkeyProblem(quiet: autostart);
+        else if (!ExposeHotkeyStatus.Succeeded)
+            ReportExposeHotkeyProblem();
         else if (!Settings.FirstRunTipShown)
             _tray.ShowBalloon("EdgeStage is running",
-                $"Press {Settings.Hotkey} or rest the pointer at the {EdgeName(Settings.Edge)} screen edge to switch windows.");
+                $"Press {Settings.Hotkey} or rest the pointer at the {EdgeName(Settings.Edge)} screen edge to switch windows. " +
+                $"{Settings.ExposeHotkey} shows all windows at once (Exposé).");
 
         if (LoadWarning is not null)
             _tray.ShowBalloon("EdgeStage settings were reset", LoadWarning, warning: true);
@@ -200,6 +208,8 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
 
     public void ToggleSidebar()
     {
+        if (_expose.IsOpen)
+            _expose.Dismiss("switching to the sidebar", immediate: true, returnToPrevious: false);
         if (_sidebar.IsOpen)
         {
             if (HoldMode && _sidebar.Mode == SidebarOpenMode.Hotkey)
@@ -269,6 +279,12 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
 
     void ITrayActions.ShowSidebar() => ShowSidebar(SidebarOpenMode.Hotkey);
 
+    void ITrayActions.ShowExpose() => ShowExpose();
+
+    public bool ExposeHotkeyAvailable => ExposeHotkeyStatus.Succeeded;
+
+    public void OpenHiddenApps() => OpenSettings(SettingsPage.HiddenApps);
+
     void ITrayActions.UpdateSettings(AppSettings settings) => UpdateSettings(settings);
 
     public bool HotkeyAvailable => HotkeyStatus.Succeeded;
@@ -282,6 +298,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
     {
         settings = settings.Normalized();
         bool hotkeyChanged = settings.Hotkey != Settings.Hotkey;
+        bool exposeHotkeyChanged = settings.ExposeHotkey != Settings.ExposeHotkey;
         bool edgeChanged = settings.Edge != Settings.Edge;
         Persist(settings);
         _sidebar.ApplySettings(Settings);
@@ -291,6 +308,8 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             _sidebar.Dismiss("edge changed", immediate: true);
         if (hotkeyChanged || !HotkeyStatus.Succeeded)
             ApplyHotkey();
+        if (exposeHotkeyChanged || hotkeyChanged || !ExposeHotkeyStatus.Succeeded)
+            ApplyExposeHotkey();
         UpdateTrayTip();
         _settingsWindow?.LoadFromHost();
         return HotkeyStatus;
@@ -329,48 +348,90 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         _settingsWindow?.LoadFromHost();
     }
 
-    public void OpenSettings()
+    public void OpenSettings() => OpenSettings(SettingsPage.General);
+
+    public void OpenSettings(SettingsPage page)
     {
-        if (_settingsWindow is { IsLoaded: true })
+        if (_settingsWindow is not { IsLoaded: true })
         {
-            _settingsWindow.LoadFromHost();
-            _settingsWindow.Activate();
-            return;
+            _settingsWindow = new SettingsWindow(this);
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsWindow.Show();
         }
-        _settingsWindow = new SettingsWindow(this);
-        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
-        _settingsWindow.Show();
+        _settingsWindow.LoadFromHost();
+        _settingsWindow.ShowPage(page);
         _settingsWindow.Activate();
     }
 
     public void Exit() => ExitRequested?.Invoke();
 
     /// <summary>Checks whether <paramref name="hotkey"/> is available (our own current hotkey counts as available).</summary>
-    public HotkeyRegistrationResult ProbeHotkey(Hotkey hotkey) =>
-        hotkey == Settings.Hotkey && HotkeyStatus.Succeeded && !_hotkeySuspended
-            ? new HotkeyRegistrationResult(HotkeyRegistrationStatus.Registered)
-            : _hotkeys.Probe(hotkey);
+    public HotkeyRegistrationResult ProbeHotkey(Hotkey hotkey) => ProbeHotkey(hotkey, forExpose: false);
 
+    /// <summary>Checks whether <paramref name="hotkey"/> is available for the sidebar or for Exposé (the shortcut's own current value counts as available).</summary>
+    public HotkeyRegistrationResult ProbeHotkey(Hotkey hotkey, bool forExpose)
+    {
+        Hotkey own = forExpose ? Settings.ExposeHotkey : Settings.Hotkey;
+        Hotkey other = forExpose ? Settings.Hotkey : Settings.ExposeHotkey;
+        bool ownRegistered = forExpose ? ExposeHotkeyStatus.Succeeded : HotkeyStatus.Succeeded;
+        if (hotkey == other)
+            return new HotkeyRegistrationResult(HotkeyRegistrationStatus.Duplicate);
+        if (hotkey == own && ownRegistered && !_hotkeySuspended)
+            return new HotkeyRegistrationResult(HotkeyRegistrationStatus.Registered);
+        return _hotkeys.Probe(hotkey);
+    }
+
+    /// <summary>Releases both global shortcuts while the user records a new one, so the keys reach the recorder.</summary>
     public void SuspendHotkey()
     {
         _hotkeySuspended = true;
         _hotkeys.Unregister(SidebarHotkeyId);
+        _hotkeys.Unregister(ExposeHotkeyId);
     }
 
     public void ResumeHotkey()
     {
         _hotkeySuspended = false;
         ApplyHotkey();
+        ApplyExposeHotkey();
         UpdateTrayTip();
     }
 
-    public Hotkey? SuggestFreeHotkey()
+    public Hotkey? SuggestFreeHotkey() => SuggestFreeHotkey(forExpose: false);
+
+    public Hotkey? SuggestFreeHotkey(bool forExpose)
     {
-        foreach (string text in FallbackHotkeys)
-            if (Hotkey.TryParse(text, out Hotkey candidate) && candidate != Settings.Hotkey && _hotkeys.Probe(candidate).Succeeded)
+        foreach (string text in forExpose ? FallbackExposeHotkeys : FallbackHotkeys)
+            if (Hotkey.TryParse(text, out Hotkey candidate) && candidate != Settings.Hotkey
+                && candidate != Settings.ExposeHotkey && _hotkeys.Probe(candidate).Succeeded)
                 return candidate;
         return null;
     }
+
+    /// <summary>Registers the Exposé shortcut. A conflict is reported, never resolved by picking another key.</summary>
+    private void ApplyExposeHotkey()
+    {
+        if (_hotkeySuspended)
+            return;
+        if (Settings.ExposeHotkey == Settings.Hotkey)
+        {
+            _hotkeys.Unregister(ExposeHotkeyId);
+            ExposeHotkeyStatus = new HotkeyRegistrationResult(HotkeyRegistrationStatus.Duplicate);
+            Log.Warn($"Exposé shortcut {Settings.ExposeHotkey} is the same as the sidebar shortcut; not registered.");
+            return;
+        }
+        ExposeHotkeyStatus = _hotkeys.Register(ExposeHotkeyId, Settings.ExposeHotkey);
+        if (ExposeHotkeyStatus.Succeeded)
+            Log.Info($"Exposé hotkey {Settings.ExposeHotkey} registered.");
+        else
+            Log.Warn($"Exposé hotkey {Settings.ExposeHotkey} not registered: {ExposeHotkeyStatus.Status} (error {ExposeHotkeyStatus.Win32Error}).");
+    }
+
+    /// <summary>Exposé is optional, so its shortcut problem is a quiet tray notification only.</summary>
+    private void ReportExposeHotkeyProblem() =>
+        _tray.ShowBalloon("Exposé shortcut unavailable",
+            $"{Settings.ExposeHotkey} is {(ExposeHotkeyStatus.Status == HotkeyRegistrationStatus.Duplicate ? "the same as the sidebar shortcut" : "used by another app")}. " +
+            "Exposé still opens from the tray and the sidebar. Choose a different shortcut in settings.", warning: true);
 
     private void ApplyHotkey()
     {
@@ -406,7 +467,8 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
     {
         string hotkey = HotkeyStatus.Succeeded ? Settings.Hotkey.ToString() : $"{Settings.Hotkey} unavailable";
         string edge = Settings.EdgeActivationEnabled ? $"{EdgeName(Settings.Edge)} edge" : "edge off";
-        _tray.SetTip($"{AppInfo.ProductName} — {hotkey} · {edge}");
+        string expose = ExposeHotkeyStatus.Succeeded ? $"Exposé {Settings.ExposeHotkey}" : "Exposé (no shortcut)";
+        _tray.SetTip($"{AppInfo.ProductName} — {hotkey} · {edge} · {expose}");
     }
 
     private static string EdgeName(ScreenEdge edge) => edge == ScreenEdge.Left ? "left" : "right";
@@ -493,6 +555,9 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         {
             case SidebarHotkeyId:
                 ToggleSidebar();
+                break;
+            case ExposeHotkeyId:
+                ToggleExpose();
                 break;
             case EscapeHotkeyId:
                 _sidebar.Dismiss("escape");

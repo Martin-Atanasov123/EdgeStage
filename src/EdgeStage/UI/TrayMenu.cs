@@ -14,8 +14,11 @@ internal interface ITrayActions
 {
     AppSettings Settings { get; }
     bool HotkeyAvailable { get; }
+    bool ExposeHotkeyAvailable { get; }
     bool StartWithWindows { get; }
     void ShowSidebar();
+    void ShowExpose();
+    void OpenHiddenApps();
     void UpdateSettings(AppSettings settings);
     void SetStartWithWindows(bool enabled);
     void OpenSettings();
@@ -53,7 +56,8 @@ internal static class TrayMenu
         AppSettings s = actions.Settings;
         var menu = new ContextMenu { Style = Application.Current?.TryFindResource("TrayMenu") as Style };
 
-        menu.Items.Add(Item("Show sidebar", () => actions.ShowSidebar(), bold: true));
+        menu.Items.Add(Item("Open sidebar", () => actions.ShowSidebar(), bold: true, gesture: actions.HotkeyAvailable ? s.Hotkey.ToString() : null));
+        menu.Items.Add(Item("Open Exposé", () => actions.ShowExpose(), gesture: actions.ExposeHotkeyAvailable ? s.ExposeHotkey.ToString() : null));
         menu.Items.Add(new Separator());
 
         menu.Items.Add(Check("Edge activation", s.EdgeActivationEnabled,
@@ -79,6 +83,7 @@ internal static class TrayMenu
             () => actions.SetStartWithWindows(!actions.StartWithWindows)));
 
         menu.Items.Add(new Separator());
+        menu.Items.Add(Item("Hidden apps…", actions.OpenHiddenApps));
         menu.Items.Add(Item("Settings…", actions.OpenSettings));
         menu.Items.Add(Item("Exit EdgeStage", actions.Exit));
         return menu;
@@ -99,9 +104,9 @@ internal static class TrayMenu
         s_lastMenu = menu;
     }
 
-    private static MenuItem Item(string header, Action onClick, bool bold = false)
+    private static MenuItem Item(string header, Action onClick, bool bold = false, string? gesture = null)
     {
-        var item = new MenuItem { Header = header };
+        var item = new MenuItem { Header = header, InputGestureText = gesture ?? "" };
         if (bold)
             item.FontWeight = FontWeights.SemiBold;
         item.Click += (_, _) => onClick();
