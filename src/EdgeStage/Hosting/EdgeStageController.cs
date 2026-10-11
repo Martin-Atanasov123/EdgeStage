@@ -43,6 +43,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
     private int _sidebarMonitor;
     private readonly DispatcherTimer _holdWatcher;
     private bool _hotkeySuspended;
+    private SettingsPage _balloonPage = SettingsPage.Sidebar;
     private bool _sessionLocked;
     private bool _disposed;
 
@@ -57,6 +58,10 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             Log.Info($"Settings from EdgeStage 1.x were carried over (original kept as {store.V1BackupPath}).");
         if (outcome == SettingsLoadOutcome.RecoveredFromCorruption)
             LoadWarning = "Your settings file could not be read, so defaults are in use. A copy was saved next to it as settings.json.bak.";
+
+        // Colors first: every window created below picks them up.
+        if (System.Windows.Application.Current is { } app)
+            ThemeManager.Apply(app.Resources, Settings);
 
         _hotkeys = new HotkeyService(_messages.Handle);
         _hotkeys.Pressed += OnHotkeyPressed;
@@ -92,7 +97,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         _tray = new TrayIcon(_messages.Handle, AppInfo.ProductName);
         _tray.Invoked += () => ShowSidebar(SidebarOpenMode.Hotkey);
         _tray.ContextMenuRequested += () => TrayMenu.Show(this);
-        _tray.BalloonClicked += OpenSettings;
+        _tray.BalloonClicked += () => OpenSettings(_balloonPage);
         _sidebar.ActivationFailed += OnActivationFailed;
         _expose.ActivationFailed += OnActivationFailed;
     }
@@ -297,10 +302,13 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
     public HotkeyRegistrationResult UpdateSettings(AppSettings settings)
     {
         settings = settings.Normalized();
+        bool themeChanged = settings.Theme != Settings.Theme || settings.Accent != Settings.Accent;
         bool hotkeyChanged = settings.Hotkey != Settings.Hotkey;
         bool exposeHotkeyChanged = settings.ExposeHotkey != Settings.ExposeHotkey;
         bool edgeChanged = settings.Edge != Settings.Edge;
         Persist(settings);
+        if (themeChanged && System.Windows.Application.Current is { } app)
+            ThemeManager.Apply(app.Resources, Settings);
         _sidebar.ApplySettings(Settings);
         _expose.ApplySettings(Settings);
         _edge.Configure(settings.EdgeActivationEnabled, settings.Edge, settings.ActivationDelayMs, settings.EdgeInFullscreen);
@@ -348,7 +356,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         _settingsWindow?.LoadFromHost();
     }
 
-    public void OpenSettings() => OpenSettings(SettingsPage.General);
+    public void OpenSettings() => OpenSettings(SettingsPage.Appearance);
 
     public void OpenSettings(SettingsPage page)
     {
@@ -428,10 +436,13 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
     }
 
     /// <summary>Exposé is optional, so its shortcut problem is a quiet tray notification only.</summary>
-    private void ReportExposeHotkeyProblem() =>
+    private void ReportExposeHotkeyProblem()
+    {
+        _balloonPage = SettingsPage.Expose;
         _tray.ShowBalloon("Exposé shortcut unavailable",
             $"{Settings.ExposeHotkey} is {(ExposeHotkeyStatus.Status == HotkeyRegistrationStatus.Duplicate ? "the same as the sidebar shortcut" : "used by another app")}. " +
             "Exposé still opens from the tray and the sidebar. Choose a different shortcut in settings.", warning: true);
+    }
 
     private void ApplyHotkey()
     {
@@ -457,10 +468,11 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
                       "The screen edge still works. Choose a different shortcut in settings.";
         if (quiet)
         {
+            _balloonPage = SettingsPage.Sidebar;
             _tray.ShowBalloon("EdgeStage shortcut unavailable", text, warning: true);
             return;
         }
-        new NoticeWindow($"Shortcut {Settings.Hotkey} is not available", text, "Choose a shortcut…", OpenSettings).Show();
+        new NoticeWindow($"Shortcut {Settings.Hotkey} is not available", text, "Choose a shortcut…", () => OpenSettings(SettingsPage.Sidebar)).Show();
     }
 
     private void UpdateTrayTip()

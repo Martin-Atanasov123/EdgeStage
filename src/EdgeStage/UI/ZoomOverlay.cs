@@ -23,6 +23,9 @@ internal sealed class ZoomOverlay : Window
     private const double GrowMs = 200;
     private const double FadeMs = 90;
 
+    /// <summary>Animation speed multiplier from the settings (1 = default; 0.5 = twice as long).</summary>
+    public double Speed { get; set; } = 1;
+
     private readonly nint _hwnd;
 
     public ZoomOverlay()
@@ -104,13 +107,13 @@ internal sealed class ZoomOverlay : Window
             User32.SetWindowPos(_hwnd, HWND_TOPMOST, bounds.Left, bounds.Top, bounds.Width, bounds.Height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
             Show();
 
-            await Frames(GrowMs, t => Place(Lerp(from, to, EaseOutQuart(t)), 255));
+            await Frames(GrowMs / Speed, t => Place(Lerp(from, to, EaseOutQuart(t)), 255));
 
             // Normally already finished; never hold the screen for long if Windows is slow.
             if (await Task.WhenAny(activation, Task.Delay(700)) != activation)
                 Log.Warn("Zoom: activation took longer than 700 ms.");
 
-            await Frames(FadeMs, t => Place(to, (byte)Math.Round(255 * (1 - t))));
+            await Frames(FadeMs / Speed, t => Place(to, (byte)Math.Round(255 * (1 - t))));
             return await activation;
         }
         finally

@@ -28,13 +28,14 @@ public sealed record ExposeOptions(
     bool ShowIcons = true,
     bool Search = true,
     bool Animations = true,
-    double AnimationScale = 1.0)
+    double AnimationScale = 1.0,
+    bool Instant = false)
 {
     public static ExposeOptions Default { get; } = new();
 
     public static ExposeOptions From(AppSettings s) => new(
         s.ExposeAllMonitors, s.ExposeDensity, s.CardSize, s.ExposeGrouping, s.ExposeShowTitles,
-        s.ExposeShowIcons, s.ExposeSearch, s.UseMotion, s.AnimationSpeed);
+        s.ExposeShowIcons, s.ExposeSearch, s.UseMotion, s.AnimationSpeed, Instant: !s.Animations);
 }
 
 /// <summary>
@@ -138,6 +139,17 @@ public partial class ExposeWindow : Window
         AddHandler(PreviewCard.HideAppRequestedEvent, new RoutedEventHandler(OnHideAppRequested));
         Closed += (_, _) => _mask.Close();
         ApplyMetrics(CardMetrics.Default);
+        // The corner shapes are drawn in the card color, which follows the theme.
+        _mask.SetColors(ThemeManager.CardBackground, ThemeManager.CardHover);
+        ThemeManager.Changed += OnThemeChanged;
+        Closed += (_, _) => ThemeManager.Changed -= OnThemeChanged;
+    }
+
+    private void OnThemeChanged()
+    {
+        _mask.SetColors(ThemeManager.CardBackground, ThemeManager.CardHover);
+        if (IsOpen)
+            _thumbs.Update();
     }
 
     public bool IsOpen { get; private set; }
@@ -392,7 +404,9 @@ public partial class ExposeWindow : Window
         }
 
         _opening = opening;
-        _durationMs = (motion ? (opening ? OpenDurationMs : CloseDurationMs) : FadeDurationMs) / Math.Max(0.1, _options.AnimationScale);
+        // Motion: flights. Reduced motion: a short fade. Animations off: (practically) at once.
+        _durationMs = _options.Instant ? 1
+            : (motion ? (opening ? OpenDurationMs : CloseDurationMs) : FadeDurationMs) / Math.Max(0.1, _options.AnimationScale);
         _frames = 0;
         _thumbs.ClipToViewport = false;
         _thumbs.MaskEnabled = false;

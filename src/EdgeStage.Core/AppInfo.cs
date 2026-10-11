@@ -5,6 +5,10 @@ public static class AppInfo
 {
     public const string ProductName = "EdgeStage";
 
+    /// <summary>"major.minor.patch" of the running application.</summary>
+    public static string Version =>
+        (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(AppInfo).Assembly).GetName().Version?.ToString(3) ?? "?";
+
     /// <summary>Roaming settings folder: %APPDATA%\EdgeStage.</summary>
     public static string SettingsDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ProductName);

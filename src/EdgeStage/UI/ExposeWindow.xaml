@@ -20,7 +20,7 @@
         cards' live previews are DWM thumbnails positioned over the cards' thumbnail hosts.
     -->
     <Grid x:Name="Root">
-        <Rectangle x:Name="Dim" Fill="{StaticResource ExposeDimBrush}" Opacity="0"
+        <Rectangle x:Name="Dim" Fill="{DynamicResource ExposeDimBrush}" Opacity="0"
                    MouseLeftButtonUp="OnBackgroundClicked" />
 
         <Grid x:Name="Chrome">
@@ -30,7 +30,7 @@
             </Grid.RowDefinitions>
 
             <Border x:Name="SearchBox" Grid.Row="0" HorizontalAlignment="Center" Width="380" Height="40"
-                    Margin="0,28,0,8" CornerRadius="12" Background="{StaticResource FilterBarBrush}" Opacity="0"
+                    Margin="0,28,0,8" CornerRadius="12" Background="{DynamicResource FilterBarBrush}" Opacity="0"
                     ToolTip="Type to search window titles and apps">
                 <Grid Margin="14,0">
                     <Grid.ColumnDefinitions>
@@ -39,13 +39,13 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="13"
-                               Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,10,0" VerticalAlignment="Center" />
-                    <TextBlock x:Name="FilterText" Grid.Column="1" FontSize="14" Foreground="{StaticResource PrimaryTextBrush}"
+                               Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="FilterText" Grid.Column="1" FontSize="14" Foreground="{DynamicResource PrimaryTextBrush}"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <TextBlock x:Name="SearchPlaceholder" Grid.Column="1" Text="Type to search windows" FontSize="14"
-                               Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                               Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
                     <TextBlock x:Name="CountText" Grid.Column="2" FontSize="12" Margin="10,0,0,0"
-                               Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                               Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
                 </Grid>
             </Border>
 
@@ -65,7 +65,7 @@
                                             MouseLeftButtonUp="OnCardClicked" />
                         </DataTemplate>
                         <DataTemplate DataType="{x:Type ui:GroupHeaderViewModel}">
-                            <Border CornerRadius="8" Padding="12,0" Background="{StaticResource GroupHeaderBrush}"
+                            <Border CornerRadius="8" Padding="12,0" Background="{DynamicResource GroupHeaderBrush}"
                                     Cursor="Hand" MouseLeftButtonUp="OnGroupHeaderClicked" ToolTip="Click to collapse or expand">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -75,7 +75,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock FontFamily="{StaticResource IconFont}" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0"
-                                               Foreground="{StaticResource SecondaryTextBrush}">
+                                               Foreground="{DynamicResource SecondaryTextBrush}">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Text" Value="&#xE70D;" />
@@ -90,9 +90,9 @@
                                     <Image Grid.Column="1" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
                                            Source="{Binding Icon, TargetNullValue={StaticResource GenericAppIcon}}" />
                                     <TextBlock Grid.Column="2" Text="{Binding AppName}" FontSize="14" FontWeight="SemiBold"
-                                               Foreground="{StaticResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                                               Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                                     <TextBlock Grid.Column="3" Text="{Binding Summary}" FontSize="12" Margin="10,0,0,0"
-                                               Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                                               Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
                                 </Grid>
                             </Border>
                         </DataTemplate>
@@ -101,7 +101,7 @@
             </ScrollViewer>
 
             <TextBlock x:Name="EmptyText" Grid.Row="1" Text="{Binding EmptyMessage}" FontSize="18"
-                       Foreground="{StaticResource SecondaryTextBrush}" IsHitTestVisible="False"
+                       Foreground="{DynamicResource SecondaryTextBrush}" IsHitTestVisible="False"
                        HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
         </Grid>
     </Grid>

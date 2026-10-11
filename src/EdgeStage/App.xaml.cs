@@ -70,8 +70,6 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, args) => Log.Error("Unhandled exception", args.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, args) => { Log.Error("Unobserved task exception", args.Exception); args.SetObserved(); };
 
-        SystemAccent.Apply(Resources);
-
         _controller = new EdgeStageController(SettingsStore.ForCurrentUser(), StartupRegistration.ForCurrentUser());
         _controller.ExitRequested += () =>
         {

@@ -18,19 +18,19 @@
             Cursor="Hand" SnapsToDevicePixels="True">
         <Border.Style>
             <Style TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsActive}" Value="True">
-                        <Setter Property="BorderBrush" Value="{StaticResource CardBorderActiveBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderActiveBrush}" />
                     </DataTrigger>
                     <Trigger Property="IsMouseOver" Value="True">
-                        <Setter Property="Background" Value="{StaticResource CardHoverBrush}" />
-                        <Setter Property="BorderBrush" Value="{StaticResource CardBorderHoverBrush}" />
+                        <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderHoverBrush}" />
                     </Trigger>
                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                        <Setter Property="Background" Value="{StaticResource CardHoverBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                        <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -55,7 +55,7 @@
                     <Image Width="32" Height="32" Source="{StaticResource GenericAppIcon}"
                            Visibility="{Binding Icon, Converter={StaticResource NullToVisible}}" />
                     <TextBlock Text="Preview unavailable" Margin="0,8,0,0" FontSize="11"
-                               Foreground="{StaticResource SecondaryTextBrush}" HorizontalAlignment="Center"
+                               Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Center"
                                Visibility="{Binding PreviewUnavailable, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
             </Border>
@@ -74,21 +74,21 @@
                        Source="{Binding Icon, TargetNullValue={StaticResource GenericAppIcon}}" />
 
                 <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="12.5"
-                           Foreground="{StaticResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis"
                            Text="{Binding Title}" ToolTip="{Binding Title}"
                            Visibility="{Binding Notice, Converter={StaticResource NullToVisible}}" />
                 <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="11.5"
-                           Foreground="{StaticResource WarningTextBrush}" TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource WarningTextBrush}" TextTrimming="CharacterEllipsis"
                            Text="{Binding Notice}" ToolTip="{Binding Notice}"
                            Visibility="{Binding Notice, Converter={StaticResource NullToCollapsed}}" />
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
-                    <Border CornerRadius="4" Padding="5,1" Background="{StaticResource BadgeBackgroundBrush}"
+                    <Border CornerRadius="4" Padding="5,1" Background="{DynamicResource BadgeBackgroundBrush}"
                             Visibility="{Binding IsMinimized, Converter={StaticResource BoolToVisibility}}"
                             ToolTip="Minimized: the preview shows the window as it was when it was minimized.">
-                        <TextBlock Text="Minimized" FontSize="10" Foreground="{StaticResource SecondaryTextBrush}" />
+                        <TextBlock Text="Minimized" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </Border>
-                    <Ellipse Width="6" Height="6" Margin="6,0,0,0" Fill="{StaticResource AccentBrush}"
+                    <Ellipse Width="6" Height="6" Margin="6,0,0,0" Fill="{DynamicResource AccentBrush}"
                              ToolTip="Current window"
                              Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
@@ -100,7 +100,7 @@
                     <Button.Style>
                         <Style TargetType="Button">
                             <Setter Property="Visibility" Value="Hidden" />
-                            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Button">

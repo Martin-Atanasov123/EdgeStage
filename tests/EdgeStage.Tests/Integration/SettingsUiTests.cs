@@ -15,6 +15,7 @@ internal sealed class FakeHost : ITrayActions, ISettingsHost
 {
     public AppSettings Settings { get; set; } = AppSettings.Default;
     public HotkeyRegistrationResult HotkeyStatus { get; set; } = new(HotkeyRegistrationStatus.Registered);
+    public HotkeyRegistrationResult ExposeHotkeyStatus { get; set; } = new(HotkeyRegistrationStatus.Registered);
     public StartupState StartupState { get; set; } = StartupState.Disabled;
     public bool HotkeyAvailable => HotkeyStatus.Succeeded;
     public bool StartWithWindows => StartupState == StartupState.Enabled;
@@ -30,8 +31,8 @@ internal sealed class FakeHost : ITrayActions, ISettingsHost
     public void Exit() => Calls.Add("exit");
     public void SuspendHotkey() => Calls.Add("suspend");
     public void ResumeHotkey() => Calls.Add("resume");
-    public Hotkey? SuggestFreeHotkey() => Suggestion;
-    public HotkeyRegistrationResult ProbeHotkey(Hotkey hotkey) => Probe(hotkey);
+    public Hotkey? SuggestFreeHotkey(bool forExpose) => Suggestion;
+    public HotkeyRegistrationResult ProbeHotkey(Hotkey hotkey, bool forExpose) => Probe(hotkey);
 
     public void SetStartWithWindows(bool enabled)
     {

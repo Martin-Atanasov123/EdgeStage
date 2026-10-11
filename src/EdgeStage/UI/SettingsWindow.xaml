@@ -4,211 +4,580 @@
         x:ClassModifier="internal"
         Title="EdgeStage settings"
         Icon="pack://application:,,,/EdgeStage;component/Assets/EdgeStage.ico"
-        Width="480" SizeToContent="Height" ResizeMode="NoResize"
+        Width="700" Height="640" ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource SurfaceBrush}"
-        Foreground="{StaticResource PrimaryTextBrush}"
+        Background="{DynamicResource SurfaceBrush}"
+        Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="{StaticResource UiFont}" FontSize="13"
         UseLayoutRounding="True">
     <Window.Resources>
         <Style x:Key="SectionHeader" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" />
-            <Setter Property="Margin" Value="4,18,0,6" />
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+            <Setter Property="Margin" Value="4,16,0,6" />
+        </Style>
+        <Style x:Key="PageTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="2,0,0,2" />
         </Style>
         <Style x:Key="Row" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="14,10" />
             <Setter Property="Margin" Value="0,0,0,4" />
         </Style>
         <Style x:Key="Hint" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11.5" />
-            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Margin" Value="0,3,0,0" />
         </Style>
+        <Style x:Key="ValueText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style x:Key="SegmentGroup" TargetType="Border">
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
+            <Setter Property="Padding" Value="1" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Left navigation entry; Tag holds the icon glyph. -->
+        <Style x:Key="NavItem" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="GroupName" Value="Nav" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Grid>
+                            <Border x:Name="Bd" CornerRadius="6" Padding="12,8" Background="Transparent">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{TemplateBinding Tag}" FontFamily="{StaticResource IconFont}" FontSize="14"
+                                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                                    <ContentPresenter VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="Bar" Width="3" Height="16" CornerRadius="1.5" HorizontalAlignment="Left"
+                                    Background="{DynamicResource AccentBrush}" Visibility="Hidden" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HighlightBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavSelectedBrush}" />
+                                <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="1" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Round accent color swatch (RadioButton); Background is the color. -->
+        <Style x:Key="Swatch" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,8,6" />
+            <Setter Property="GroupName" Value="Accent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Grid Width="30" Height="30" Background="Transparent">
+                            <Ellipse x:Name="Ring" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="2" Visibility="Hidden" />
+                            <Ellipse Width="22" Height="22" Fill="{TemplateBinding Background}" />
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.85" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
-    <StackPanel Margin="20,16,20,18">
-        <!-- Header -->
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <Image Source="pack://application:,,,/EdgeStage;component/Assets/EdgeStage.ico" Width="36" Height="36" Margin="0,0,12,0" />
-            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                <TextBlock Text="EdgeStage" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="Switch windows from live previews at the edge of the screen." Style="{StaticResource Hint}" />
-            </StackPanel>
-        </Grid>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="190" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <TextBlock Text="OPEN THE SIDEBAR" Style="{StaticResource SectionHeader}" />
-
-        <Border Style="{StaticResource Row}">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Keyboard shortcut" />
-                        <TextBlock Text="Click the box, then press the new shortcut." Style="{StaticResource Hint}" />
-                    </StackPanel>
-                    <Border x:Name="HotkeyBox" Grid.Column="1" MinWidth="160" Height="32" CornerRadius="5" BorderThickness="1"
-                            Background="{StaticResource ControlBrush}" BorderBrush="{StaticResource ControlBorderBrush}"
-                            Focusable="True" Cursor="Hand" FocusVisualStyle="{x:Null}"
-                            AutomationProperties.Name="Keyboard shortcut"
-                            MouseLeftButtonDown="OnHotkeyBoxClicked" GotKeyboardFocus="OnHotkeyBoxFocused"
-                            LostKeyboardFocus="OnHotkeyBoxBlurred" PreviewKeyDown="OnHotkeyBoxKeyDown">
-                        <TextBlock x:Name="HotkeyText" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0" />
-                    </Border>
-                </Grid>
-                <Grid x:Name="HotkeyStatusRow" Margin="0,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="HotkeyStatus" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0" />
-                    <Button x:Name="SuggestButton" Grid.Column="1" Style="{StaticResource DarkButton}" Padding="10,3"
-                            Margin="8,0,0,0" Visibility="Collapsed" Click="OnUseSuggestion" />
-                </Grid>
-            </StackPanel>
-        </Border>
-
-        <Border Style="{StaticResource Row}">
-            <CheckBox x:Name="EdgeEnabled" Style="{StaticResource ToggleSwitch}" Checked="OnEdgeToggled" Unchecked="OnEdgeToggled">
-                <StackPanel>
-                    <TextBlock Text="Open when the pointer rests at the screen edge" />
-                    <TextBlock Text="Turned off automatically while a full-screen app is running." Style="{StaticResource Hint}" />
+        <!-- Navigation -->
+        <DockPanel Margin="12,16,8,14">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,0,16">
+                <Image Source="pack://application:,,,/EdgeStage;component/Assets/EdgeStage.ico" Width="28" Height="28" Margin="0,0,10,0" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="EdgeStage" FontSize="15" FontWeight="SemiBold" />
+                    <TextBlock x:Name="VersionText" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
                 </StackPanel>
-            </CheckBox>
-        </Border>
+            </StackPanel>
+            <TextBlock DockPanel.Dock="Bottom" Text="Changes are saved automatically." Style="{StaticResource Hint}" Margin="6,0,0,0" />
+            <StackPanel>
+                <RadioButton x:Name="NavAppearance" Style="{StaticResource NavItem}" Tag="&#xE790;" Content="Appearance" Checked="OnNavigate" />
+                <RadioButton x:Name="NavSidebar" Style="{StaticResource NavItem}" Tag="&#xE8A0;" Content="Sidebar" Checked="OnNavigate" />
+                <RadioButton x:Name="NavExpose" Style="{StaticResource NavItem}" Tag="&#xE8A9;" Content="Exposé" Checked="OnNavigate" />
+                <RadioButton x:Name="NavHiddenApps" Style="{StaticResource NavItem}" Tag="&#xED1A;" Content="Hidden apps" Checked="OnNavigate" />
+                <RadioButton x:Name="NavGeneral" Style="{StaticResource NavItem}" Tag="&#xE713;" Content="General" Checked="OnNavigate" />
+            </StackPanel>
+        </DockPanel>
 
-        <Border Style="{StaticResource Row}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="Screen edge" VerticalAlignment="Center" />
-                <Border Grid.Column="1" CornerRadius="7" Background="{StaticResource ControlBrush}" Padding="1">
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="EdgeLeft" Content="Left" GroupName="Edge" Style="{StaticResource Segment}" Checked="OnEdgeSideChanged" />
-                        <RadioButton x:Name="EdgeRight" Content="Right" GroupName="Edge" Style="{StaticResource Segment}" Checked="OnEdgeSideChanged" />
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <ScrollViewer x:Name="PageScroller" VerticalScrollBarVisibility="Auto" Focusable="False" Style="{StaticResource SlimScrollViewer}">
+                <Grid Margin="8,16,20,12">
+
+                    <!-- ===== Appearance ===== -->
+                    <StackPanel x:Name="PageAppearance">
+                        <TextBlock Text="Appearance" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Colors, sizes and motion of the sidebar and Exposé." Style="{StaticResource Hint}" Margin="2,0,0,4" />
+
+                        <TextBlock Text="COLORS" Style="{StaticResource SectionHeader}" />
+                        <Border Style="{StaticResource Row}">
+                            <Grid>
+                                <TextBlock Text="Theme" VerticalAlignment="Center" />
+                                <Border Style="{StaticResource SegmentGroup}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton x:Name="ThemeDark" Content="Dark" GroupName="Theme" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="ThemeLight" Content="Light" GroupName="Theme" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="ThemeSystem" Content="System" GroupName="Theme" Style="{StaticResource Segment}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <TextBlock Text="Accent color" />
+                                <TextBlock Text="Selection and highlights. The first swatch follows your Windows accent color." Style="{StaticResource Hint}" />
+                                <WrapPanel x:Name="AccentSwatches" Margin="0,10,0,0" />
+                                <Grid x:Name="CustomAccentRow" Margin="0,4,0,0" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Custom color" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                    <TextBox x:Name="CustomAccent" Grid.Column="1" Height="28" Padding="6,3" VerticalContentAlignment="Center"
+                                             Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource PrimaryTextBrush}"
+                                             BorderBrush="{DynamicResource ControlBorderBrush}" CaretBrush="{DynamicResource PrimaryTextBrush}"
+                                             MaxLength="7" AutomationProperties.Name="Custom accent color as #RRGGBB"
+                                             TextChanged="OnCustomAccentChanged" />
+                                    <TextBlock x:Name="CustomAccentHint" Grid.Column="2" Text="#RRGGBB, e.g. #3A86FF" Style="{StaticResource Hint}"
+                                               VerticalAlignment="Center" Margin="10,0,0,0" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="LAYOUT" Style="{StaticResource SectionHeader}" />
+                        <Border Style="{StaticResource Row}">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,260,0">
+                                    <TextBlock Text="Layout" />
+                                    <TextBlock Text="Padding and spacing preset." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                                <Border Style="{StaticResource SegmentGroup}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton x:Name="LayoutCompact" Content="Compact" GroupName="Layout" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="LayoutBalanced" Content="Balanced" GroupName="Layout" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="LayoutSpacious" Content="Spacious" GroupName="Layout" Style="{StaticResource Segment}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,260,0">
+                                    <TextBlock Text="Card size" />
+                                    <TextBlock Text="Previews in Exposé. The sidebar's follow its width." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                                <Border Style="{StaticResource SegmentGroup}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton x:Name="SizeSmall" Content="Small" GroupName="CardSize" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="SizeStandard" Content="Standard" GroupName="CardSize" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="SizeLarge" Content="Large" GroupName="CardSize" Style="{StaticResource Segment}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Sidebar width" />
+                                    <TextBlock x:Name="SidebarWidthText" Style="{StaticResource ValueText}" />
+                                </Grid>
+                                <Slider x:Name="SidebarWidth" Style="{StaticResource DarkSlider}" Minimum="220" Maximum="400"
+                                        TickFrequency="4" SmallChange="4" LargeChange="20" Margin="0,8,0,0"
+                                        AutomationProperties.Name="Sidebar width" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Space between cards" />
+                                    <TextBlock x:Name="CardSpacingText" Style="{StaticResource ValueText}" />
+                                </Grid>
+                                <Slider x:Name="CardSpacing" Style="{StaticResource DarkSlider}" Minimum="0" Maximum="24"
+                                        TickFrequency="1" SmallChange="1" LargeChange="4" Margin="0,8,0,0"
+                                        AutomationProperties.Name="Space between cards" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Card corner radius" />
+                                    <TextBlock x:Name="CornerRadiusText" Style="{StaticResource ValueText}" />
+                                </Grid>
+                                <Slider x:Name="CornerRadiusSlider" Style="{StaticResource DarkSlider}" Minimum="0" Maximum="20"
+                                        TickFrequency="1" SmallChange="1" LargeChange="4" Margin="0,8,0,0"
+                                        AutomationProperties.Name="Card corner radius" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="MOTION" Style="{StaticResource SectionHeader}" />
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="AnimationsEnabled" Style="{StaticResource ToggleSwitch}">
+                                <StackPanel>
+                                    <TextBlock Text="Animations" />
+                                    <TextBlock Text="Slide, zoom and fly transitions. Off: views appear at once." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}" x:Name="AnimationDurationRow">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Animation duration" />
+                                    <TextBlock x:Name="AnimationDurationText" Style="{StaticResource ValueText}" />
+                                </Grid>
+                                <Slider x:Name="AnimationDuration" Style="{StaticResource DarkSlider}" Minimum="50" Maximum="200"
+                                        TickFrequency="10" SmallChange="10" LargeChange="25" Margin="0,8,0,0"
+                                        AutomationProperties.Name="Animation duration in percent" />
+                                <Grid Margin="0,2,0,0">
+                                    <TextBlock Text="Faster" Style="{StaticResource Hint}" Margin="0" />
+                                    <TextBlock Text="Slower" Style="{StaticResource Hint}" Margin="0" HorizontalAlignment="Right" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="ReducedMotion" Style="{StaticResource ToggleSwitch}">
+                                <StackPanel>
+                                    <TextBlock Text="Reduce motion" />
+                                    <TextBlock Text="Short fades instead of movement. Also follows Windows' “Animation effects” setting." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
                     </StackPanel>
-                </Border>
+
+                    <!-- ===== Sidebar ===== -->
+                    <StackPanel x:Name="PageSidebar" Visibility="Collapsed">
+                        <TextBlock Text="Sidebar" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="The strip of live previews at the edge of the screen." Style="{StaticResource Hint}" Margin="2,0,0,4" />
+
+                        <TextBlock Text="OPEN THE SIDEBAR" Style="{StaticResource SectionHeader}" />
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Keyboard shortcut" />
+                                        <TextBlock Text="Click the box, then press the new shortcut." Style="{StaticResource Hint}" />
+                                    </StackPanel>
+                                    <Border x:Name="HotkeyBox" Grid.Column="1" MinWidth="160" Height="32" CornerRadius="5" BorderThickness="1"
+                                            Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource ControlBorderBrush}"
+                                            Focusable="True" Cursor="Hand" FocusVisualStyle="{x:Null}"
+                                            AutomationProperties.Name="Sidebar keyboard shortcut">
+                                        <TextBlock x:Name="HotkeyText" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0" />
+                                    </Border>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="HotkeyStatus" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0" />
+                                    <Button x:Name="SuggestButton" Grid.Column="1" Style="{StaticResource DarkButton}" Padding="10,3"
+                                            Margin="8,0,0,0" Visibility="Collapsed" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="HoldToSwitch" Style="{StaticResource ToggleSwitch}">
+                                <StackPanel>
+                                    <TextBlock Text="Hold to switch (like Alt+Tab)" />
+                                    <TextBlock Text="Keep the shortcut's modifier keys held and press its key again to step through windows; release to switch." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="EdgeEnabled" Style="{StaticResource ToggleSwitch}">
+                                <StackPanel>
+                                    <TextBlock Text="Open when the pointer rests at the screen edge" />
+                                    <TextBlock Text="Never while a mouse button is held (dragging windows)." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <Grid>
+                                <TextBlock Text="Screen edge" VerticalAlignment="Center" />
+                                <Border Style="{StaticResource SegmentGroup}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton x:Name="EdgeLeft" Content="Left" GroupName="Edge" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="EdgeRight" Content="Right" GroupName="Edge" Style="{StaticResource Segment}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Edge activation delay" />
+                                    <TextBlock x:Name="ActivationDelayText" Style="{StaticResource ValueText}" />
+                                </Grid>
+                                <Slider x:Name="ActivationDelay" Style="{StaticResource DarkSlider}" Minimum="0" Maximum="1000"
+                                        TickFrequency="50" SmallChange="50" LargeChange="100" Margin="0,8,0,0"
+                                        AutomationProperties.Name="Edge activation delay in milliseconds" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Hide after the pointer leaves" />
+                                    <TextBlock x:Name="DismissDelayText" Style="{StaticResource ValueText}" />
+                                </Grid>
+                                <Slider x:Name="DismissDelay" Style="{StaticResource DarkSlider}" Minimum="0" Maximum="2000"
+                                        TickFrequency="50" SmallChange="50" LargeChange="200" Margin="0,8,0,0"
+                                        AutomationProperties.Name="Hide delay in milliseconds" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="EdgeInFullscreen" Style="{StaticResource ToggleSwitch}">
+                                <StackPanel>
+                                    <TextBlock Text="Also over full-screen apps" />
+                                    <TextBlock Text="Off: the edge never opens the sidebar over games or videos. The shortcut always works." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+
+                        <TextBlock Text="WINDOWS" Style="{StaticResource SectionHeader}" />
+                        <Border Style="{StaticResource Row}">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,200,0">
+                                    <TextBlock Text="Order" />
+                                    <TextBlock Text="By app: one collapsible group per app." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                                <Border Style="{StaticResource SegmentGroup}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton x:Name="OrderRecent" Content="Recent" GroupName="Order" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="OrderByApp" Content="By app" GroupName="Order" Style="{StaticResource Segment}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="SidebarSearch" Style="{StaticResource ToggleSwitch}">
+                                <StackPanel>
+                                    <TextBlock Text="Type to search" />
+                                    <TextBlock Text="Typing filters the windows by title and app; Esc clears the search first." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="OnlyMonitor" Style="{StaticResource ToggleSwitch}">
+                                <StackPanel>
+                                    <TextBlock Text="Only windows on this monitor" />
+                                    <TextBlock Text="List just the windows that are on the screen the sidebar opens on." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ===== Exposé ===== -->
+                    <StackPanel x:Name="PageExpose" Visibility="Collapsed">
+                        <TextBlock Text="Exposé" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Every window at once in a grid. Also opens from the sidebar's header and the tray." Style="{StaticResource Hint}" Margin="2,0,0,4" />
+
+                        <TextBlock Text="OPEN EXPOSÉ" Style="{StaticResource SectionHeader}" />
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Keyboard shortcut" />
+                                        <TextBlock Text="Press it again, or Esc, to go back to where you were." Style="{StaticResource Hint}" />
+                                    </StackPanel>
+                                    <Border x:Name="ExposeHotkeyBox" Grid.Column="1" MinWidth="160" Height="32" CornerRadius="5" BorderThickness="1"
+                                            Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource ControlBorderBrush}"
+                                            Focusable="True" Cursor="Hand" FocusVisualStyle="{x:Null}"
+                                            AutomationProperties.Name="Exposé keyboard shortcut">
+                                        <TextBlock x:Name="ExposeHotkeyText" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0" />
+                                    </Border>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="ExposeHotkeyStatus" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0" />
+                                    <Button x:Name="ExposeSuggestButton" Grid.Column="1" Style="{StaticResource DarkButton}" Padding="10,3"
+                                            Margin="8,0,0,0" Visibility="Collapsed" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="WINDOWS" Style="{StaticResource SectionHeader}" />
+                        <Border Style="{StaticResource Row}">
+                            <Grid>
+                                <TextBlock Text="Show windows from" VerticalAlignment="Center" />
+                                <Border Style="{StaticResource SegmentGroup}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton x:Name="ExposeThisMonitor" Content="This monitor" GroupName="ExposeMonitors" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="ExposeAllMonitors" Content="All monitors" GroupName="ExposeMonitors" Style="{StaticResource Segment}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,250,0">
+                                    <TextBlock Text="Density" />
+                                    <TextBlock Text="How large the grid's cards may grow." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                                <Border Style="{StaticResource SegmentGroup}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton x:Name="DensitySpacious" Content="Spacious" GroupName="Density" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="DensityAuto" Content="Auto" GroupName="Density" Style="{StaticResource Segment}" />
+                                        <RadioButton x:Name="DensityDense" Content="Denser" GroupName="Density" Style="{StaticResource Segment}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="ExposeGrouping" Style="{StaticResource ToggleSwitch}">
+                                <StackPanel>
+                                    <TextBlock Text="Group by app" />
+                                    <TextBlock Text="Click a group's header to collapse it." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="ExposeTitles" Style="{StaticResource ToggleSwitch}" Content="Show window titles" />
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="ExposeIcons" Style="{StaticResource ToggleSwitch}" Content="Show app icons" />
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="ExposeSearch" Style="{StaticResource ToggleSwitch}">
+                                <StackPanel>
+                                    <TextBlock Text="Type to search" />
+                                    <TextBlock Text="Typing filters the windows by title and app; Esc clears the search first." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ===== Hidden apps ===== -->
+                    <StackPanel x:Name="PageHiddenApps" Visibility="Collapsed">
+                        <TextBlock Text="Hidden apps" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Windows of these apps never appear in the sidebar or Exposé." Style="{StaticResource Hint}" Margin="2,0,0,12" />
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <TextBlock x:Name="HiddenAppsHint" Style="{StaticResource Hint}" Margin="0"
+                                           Text="Right-click a card and choose “Never show …”, or type a program name such as spotify." />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="NewApp" Height="30" Padding="8,4" VerticalContentAlignment="Center"
+                                             Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource PrimaryTextBrush}"
+                                             BorderBrush="{DynamicResource ControlBorderBrush}" CaretBrush="{DynamicResource PrimaryTextBrush}"
+                                             AutomationProperties.Name="Program name to hide" KeyDown="OnNewAppKeyDown" />
+                                    <Button Grid.Column="1" Content="Hide app" Style="{StaticResource DarkButton}" Margin="8,0,0,0" Padding="12,4" Click="OnAddHiddenApp" />
+                                </Grid>
+                                <StackPanel x:Name="HiddenAppsList" Margin="0,8,0,0" />
+                                <TextBlock x:Name="NoHiddenApps" Text="No hidden apps." Style="{StaticResource Hint}" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <Button x:Name="ShowAllApps" Content="Show all apps again" Style="{StaticResource DarkButton}" Padding="12,5"
+                                HorizontalAlignment="Left" Margin="0,8,0,0" Click="OnShowAllApps" />
+                    </StackPanel>
+
+                    <!-- ===== General ===== -->
+                    <StackPanel x:Name="PageGeneral" Visibility="Collapsed">
+                        <TextBlock Text="General" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Startup, diagnostics and defaults." Style="{StaticResource Hint}" Margin="2,0,0,12" />
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox x:Name="StartWithWindows" Style="{StaticResource ToggleSwitch}" Checked="OnStartupToggled" Unchecked="OnStartupToggled">
+                                <StackPanel>
+                                    <TextBlock Text="Start with Windows" />
+                                    <TextBlock x:Name="StartupHint" Text="Starts EdgeStage in the background when you sign in." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <Grid>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,150,0">
+                                    <TextBlock Text="Log files" />
+                                    <TextBlock Text="Useful when reporting a problem." Style="{StaticResource Hint}" />
+                                </StackPanel>
+                                <Button Content="Open log folder" Style="{StaticResource DarkButton}" HorizontalAlignment="Right" VerticalAlignment="Center" Click="OnOpenLogs" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel VerticalAlignment="Center" Margin="0,0,110,0">
+                                        <TextBlock Text="Reset to defaults" />
+                                        <TextBlock Text="Appearance, sidebar and Exposé settings, including both shortcuts. Hidden apps and Start with Windows are kept." Style="{StaticResource Hint}" />
+                                    </StackPanel>
+                                    <Button x:Name="ResetButton" Content="Reset…" Style="{StaticResource DarkButton}" HorizontalAlignment="Right" VerticalAlignment="Center" Click="OnResetClicked" />
+                                </Grid>
+                                <Border x:Name="ResetConfirm" Visibility="Collapsed" Margin="0,10,0,0" Padding="12,10" CornerRadius="6"
+                                        Background="{DynamicResource HighlightBrush}">
+                                    <Grid>
+                                        <TextBlock Text="Reset all of these settings now?" VerticalAlignment="Center" Margin="0,0,170,0" TextWrapping="Wrap" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button x:Name="ResetYes" Content="Reset" Style="{StaticResource DarkButton}" Margin="0,0,8,0" Click="OnResetConfirmed" />
+                                            <Button x:Name="ResetNo" Content="Cancel" Style="{StaticResource DarkButton}" Click="OnResetCancelled" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <TextBlock x:Name="ResetDone" Text="Settings were reset to their defaults." Style="{StaticResource Hint}" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+
+            <Grid Grid.Row="1" Margin="8,0,20,14">
+                <Button Content="Close" Style="{StaticResource DarkButton}" IsCancel="True" HorizontalAlignment="Right" Click="OnClose" />
             </Grid>
-        </Border>
-
-        <Border Style="{StaticResource Row}">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="Edge activation delay" />
-                    <TextBlock x:Name="ActivationDelayText" Grid.Column="1" Foreground="{StaticResource SecondaryTextBrush}" />
-                </Grid>
-                <Slider x:Name="ActivationDelay" Style="{StaticResource DarkSlider}" Minimum="0" Maximum="1000"
-                        TickFrequency="50" SmallChange="50" LargeChange="100" Margin="0,8,0,0"
-                        AutomationProperties.Name="Edge activation delay in milliseconds"
-                        ValueChanged="OnActivationDelayChanged" />
-            </StackPanel>
-        </Border>
-
-        <Border Style="{StaticResource Row}">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="Hide after the pointer leaves" />
-                    <TextBlock x:Name="DismissDelayText" Grid.Column="1" Foreground="{StaticResource SecondaryTextBrush}" />
-                </Grid>
-                <Slider x:Name="DismissDelay" Style="{StaticResource DarkSlider}" Minimum="0" Maximum="2000"
-                        TickFrequency="50" SmallChange="50" LargeChange="200" Margin="0,8,0,0"
-                        AutomationProperties.Name="Hide delay in milliseconds"
-                        ValueChanged="OnDismissDelayChanged" />
-            </StackPanel>
-        </Border>
-
-        <TextBlock Text="BEHAVIOR" Style="{StaticResource SectionHeader}" />
-
-        <Border Style="{StaticResource Row}">
-            <CheckBox x:Name="HoldToSwitch" Style="{StaticResource ToggleSwitch}" Checked="OnBehaviorToggled" Unchecked="OnBehaviorToggled">
-                <StackPanel>
-                    <TextBlock Text="Hold to switch (like Alt+Tab)" />
-                    <TextBlock Text="Keep the shortcut's modifier keys held and press its key again to step through windows; release to switch. Needs a shortcut with a modifier." Style="{StaticResource Hint}" />
-                </StackPanel>
-            </CheckBox>
-        </Border>
-
-        <Border Style="{StaticResource Row}">
-            <CheckBox x:Name="OnlyMonitor" Style="{StaticResource ToggleSwitch}" Checked="OnBehaviorToggled" Unchecked="OnBehaviorToggled">
-                <StackPanel>
-                    <TextBlock Text="Only windows on this monitor" />
-                    <TextBlock Text="List just the windows that are on the screen the sidebar opens on." Style="{StaticResource Hint}" />
-                </StackPanel>
-            </CheckBox>
-        </Border>
-
-        <TextBlock Text="HIDDEN APPS" Style="{StaticResource SectionHeader}" />
-
-        <Border Style="{StaticResource Row}">
-            <StackPanel>
-                <Grid>
-                    <TextBlock Text="Windows of these apps never appear in the sidebar or Exposé." TextWrapping="Wrap" Margin="0,0,84,0" />
-                    <Button x:Name="ShowAllApps" Content="Show all" Style="{StaticResource DarkButton}" Padding="10,3"
-                            HorizontalAlignment="Right" VerticalAlignment="Top" Click="OnShowAllApps"
-                            ToolTip="Remove every app from this list" />
-                </Grid>
-                <TextBlock x:Name="HiddenAppsHint" Style="{StaticResource Hint}"
-                           Text="Right-click a card and choose “Never show …”, or type a program name such as spotify." />
-                <Grid Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBox x:Name="NewApp" Height="30" Padding="8,4" VerticalContentAlignment="Center"
-                             Background="{StaticResource ControlBrush}" Foreground="{StaticResource PrimaryTextBrush}"
-                             BorderBrush="{StaticResource ControlBorderBrush}" CaretBrush="{StaticResource PrimaryTextBrush}"
-                             AutomationProperties.Name="Program name to hide" KeyDown="OnNewAppKeyDown" />
-                    <Button Grid.Column="1" Content="Hide app" Style="{StaticResource DarkButton}" Margin="8,0,0,0" Padding="12,4" Click="OnAddHiddenApp" />
-                </Grid>
-                <ScrollViewer MaxHeight="130" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0" Focusable="False">
-                    <StackPanel x:Name="HiddenAppsList" />
-                </ScrollViewer>
-            </StackPanel>
-        </Border>
-
-        <TextBlock Text="GENERAL" Style="{StaticResource SectionHeader}" />
-
-        <Border Style="{StaticResource Row}">
-            <CheckBox x:Name="StartWithWindows" Style="{StaticResource ToggleSwitch}" Checked="OnStartupToggled" Unchecked="OnStartupToggled">
-                <StackPanel>
-                    <TextBlock Text="Start with Windows" />
-                    <TextBlock x:Name="StartupHint" Text="Starts EdgeStage in the background when you sign in." Style="{StaticResource Hint}" />
-                </StackPanel>
-            </CheckBox>
-        </Border>
-
-        <Grid Margin="0,16,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="Changes are saved automatically." Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0" />
-            <Button Grid.Column="1" Content="Open log folder" Style="{StaticResource DarkButton}" Margin="0,0,8,0" Click="OnOpenLogs" />
-            <Button Grid.Column="2" Content="Close" Style="{StaticResource DarkButton}" IsCancel="True" Click="OnClose" />
         </Grid>
-    </StackPanel>
-    </ScrollViewer>
+    </Grid>
 </Window>

@@ -107,6 +107,10 @@ public partial class SidebarWindow : Window
             }
         };
         ApplyMetrics(CardMetrics.Default);
+        // The corner shapes are drawn in the card color, which follows the theme.
+        _mask.SetColors(ThemeManager.CardBackground, ThemeManager.CardHover);
+        ThemeManager.Changed += OnThemeChanged;
+        Closed += (_, _) => ThemeManager.Changed -= OnThemeChanged;
         Deactivated += (_, _) =>
         {
             if (IsOpen && Mode == SidebarOpenMode.Hotkey)
@@ -121,6 +125,13 @@ public partial class SidebarWindow : Window
             _zoom.Close();
             _mask.Close();
         };
+    }
+
+    private void OnThemeChanged()
+    {
+        _mask.SetColors(ThemeManager.CardBackground, ThemeManager.CardHover);
+        if (IsOpen)
+            _thumbs.Update();
     }
 
     public bool IsOpen { get; private set; }
@@ -280,7 +291,7 @@ public partial class SidebarWindow : Window
     // ---- animation ---------------------------------------------------------------------------------
 
     /// <summary>Offset of the sliding panel: 0 at rest, SlideDistance toward the screen edge when hidden.</summary>
-    private double SlideOffset(double hiddenFraction) =>
+    private double SlideOffset(double hiddenFraction) => !_settings.UseMotion ? 0 :
         (_edge == ScreenEdge.Left ? -1 : 1) * SlideDistanceDip * hiddenFraction;
 
     private void StartAnimation(bool show)
@@ -310,7 +321,9 @@ public partial class SidebarWindow : Window
     /// </summary>
     private void OnAnimationFrame(object? sender, EventArgs e)
     {
-        double duration = _animatingIn ? ShowDurationMs : HideDurationMs;
+        // Animations off: appear at once. Reduced motion: a short fade without the slide (see SlideOffset).
+        double duration = !_settings.Animations ? 1
+            : (_animatingIn ? ShowDurationMs : HideDurationMs) / _settings.AnimationSpeed;
         double elapsed = _animationClock.Elapsed.TotalMilliseconds;
         double t = Math.Clamp(elapsed / duration, 0, 1);
         _animationFrames++;
@@ -668,11 +681,12 @@ public partial class SidebarWindow : Window
         {
             card.Notice = null;
 
-            if (SystemParameters.ClientAreaAnimation && PlanZoom(card) is { } plan)
+            if (SystemParameters.ClientAreaAnimation && _settings.UseMotion && PlanZoom(card) is { } plan)
             {
                 // Activation starts together with the animation, while this process still holds the
                 // foreground (hiding the sidebar hands it to another app, after which Windows refuses).
                 Dismiss("window selected");
+                _zoom.Speed = _settings.AnimationSpeed;
                 ActivationResult zoomed = await _zoom.PlayAsync(card.Hwnd, plan.Bounds, plan.From, plan.To,
                     () => WindowActivator.ActivateAsync(card.Hwnd));
                 if (zoomed.Outcome == ActivationOutcome.Refused)
