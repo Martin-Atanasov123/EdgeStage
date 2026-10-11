@@ -46,6 +46,22 @@ internal static class Capture
         return $"rect {area}\n{path}";
     }
 
+    public static async Task<string> RectFrames(int x, int y, int width, int height, string outPrefix, int frames, int intervalMs)
+    {
+        var area = new RECT(x, y, x + width, y + height);
+        var log = new StringBuilder($"rect {area}\n");
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        for (int f = 0; f < frames; f++)
+        {
+            byte[] pixels = ScreenProbe.Capture(area);
+            string path = $"{outPrefix}-{f}.png";
+            Save(pixels, width, height, path);
+            log.AppendLine($"{path} @ {clock.ElapsedMilliseconds} ms");
+            if (f < frames - 1) await Task.Delay(intervalMs);
+        }
+        return log.ToString();
+    }
+
     private static void Save(byte[] bgra, int width, int height, string path)
     {
         var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgr32, null, bgra, width * 4);

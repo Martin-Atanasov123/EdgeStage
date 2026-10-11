@@ -26,6 +26,22 @@ internal static class SingleInstance
 
     /// <summary>DEBUG only: opens the tray menu at a fixed position (for screenshots).</summary>
     public static uint TestTrayMenuMessage { get; } = User32.RegisterWindowMessage("EdgeStage.Test.TrayMenu.v1");
+
+    /// <summary>DEBUG only: a numbered test command (wParam = <see cref="TestCommand"/>).</summary>
+    public static uint TestCommandMessage { get; } = User32.RegisterWindowMessage("EdgeStage.Test.Command.v1");
+
+    public enum TestCommand
+    {
+        ExposeShow = 1,
+        ExposeActivateSelected,
+        ExposeEscape,
+        ExposeRight,
+        ExposeLeft,
+        ExposeUp,
+        ExposeDown,
+        ExposeDescribe,
+        SidebarExposeButton,
+    }
 #endif
 
     public static bool TryAcquire()
@@ -41,7 +57,7 @@ internal static class SingleInstance
     }
 
     /// <summary>Posts <paramref name="message"/> to the running instance; returns false if none was found.</summary>
-    public static bool Signal(uint message)
+    public static bool Signal(uint message, nint wParam = 0)
     {
         nint target = User32.FindWindow(null, MessageWindow.WindowTitle);
         if (target == 0)
@@ -49,7 +65,7 @@ internal static class SingleInstance
         // This process was just launched by the user, so it may hand its foreground right over.
         User32.GetWindowThreadProcessId(target, out uint processId);
         User32.AllowSetForegroundWindow(processId);
-        return User32.PostMessage(target, message, 0, 0);
+        return User32.PostMessage(target, message, wParam, 0);
     }
 
     public static void Release()

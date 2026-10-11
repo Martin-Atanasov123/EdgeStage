@@ -23,7 +23,16 @@ public partial class App : Application
             if (args.Length >= 3 && args[0] is "--source" or "--source-flip" or "--source-min" or "--source-retitle")
             {
                 var color = (Color)ColorConverter.ConvertFromString(args[2]);
-                var window = new SourceWindow(args[1], color, 900, 500);
+                // Optional placement: <x> <y> <width> <height> after the color.
+                bool placed = args.Length >= 7;
+                var window = placed
+                    ? new SourceWindow(args[1], color, double.Parse(args[3]), double.Parse(args[4]))
+                    : new SourceWindow(args[1], color, 900, 500);
+                if (placed)
+                {
+                    window.Width = double.Parse(args[5]);
+                    window.Height = double.Parse(args[6]);
+                }
                 window.Closed += (_, _) => Shutdown();
                 window.Show();
                 if (args[0] == "--source-flip")
@@ -63,8 +72,10 @@ public partial class App : Application
 
             if (args.Length >= 6 && args[0] == "--capture-rect")
             {
-                // --capture-rect <x> <y> <width> <height> <out prefix>
-                File.WriteAllText(args[5] + ".txt", Capture.Rect(int.Parse(args[1]), int.Parse(args[2]), int.Parse(args[3]), int.Parse(args[4]), args[5]));
+                // --capture-rect <x> <y> <width> <height> <out prefix> [frames] [intervalMs]
+                int frames = args.Length >= 7 ? int.Parse(args[6]) : 1;
+                int interval = args.Length >= 8 ? int.Parse(args[7]) : 250;
+                File.WriteAllText(args[5] + ".txt", await Capture.RectFrames(int.Parse(args[1]), int.Parse(args[2]), int.Parse(args[3]), int.Parse(args[4]), args[5], frames, interval));
                 Shutdown(0);
                 return;
             }

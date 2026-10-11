@@ -44,6 +44,15 @@ public partial class App : Application
             Shutdown(0);
             return;
         }
+        // --test-cmd <name>: e.g. --test-cmd ExposeShow (see SingleInstance.TestCommand).
+        int cmdIndex = Array.FindIndex(e.Args, a => string.Equals(a, "--test-cmd", StringComparison.OrdinalIgnoreCase));
+        if (cmdIndex >= 0 && cmdIndex + 1 < e.Args.Length
+            && Enum.TryParse(e.Args[cmdIndex + 1], ignoreCase: true, out SingleInstance.TestCommand command))
+        {
+            SingleInstance.Signal(SingleInstance.TestCommandMessage, (nint)command);
+            Shutdown(0);
+            return;
+        }
 #endif
 
         if (!SingleInstance.TryAcquire())

@@ -13,8 +13,8 @@
         <ui:NullToVisibilityConverter x:Key="NullToVisible" Invert="True" />
     </UserControl.Resources>
 
-    <Border x:Name="Root" CornerRadius="10" BorderThickness="1.5" Padding="5"
-            Height="{x:Static ui:SidebarViewModel.CardHeight}"
+    <Border x:Name="Root" CornerRadius="{DynamicResource CardCornerRadius}" BorderThickness="1.5"
+            Padding="{DynamicResource CardPaddingThickness}"
             Cursor="Hand" SnapsToDevicePixels="True">
         <Border.Style>
             <Style TargetType="Border">
@@ -22,11 +22,11 @@
                 <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsActive}" Value="True">
-                        <Setter Property="BorderBrush" Value="#8060CDFF" />
+                        <Setter Property="BorderBrush" Value="{StaticResource CardBorderActiveBrush}" />
                     </DataTrigger>
                     <Trigger Property="IsMouseOver" Value="True">
                         <Setter Property="Background" Value="{StaticResource CardHoverBrush}" />
-                        <Setter Property="BorderBrush" Value="#B3FFFFFF" />
+                        <Setter Property="BorderBrush" Value="{StaticResource CardBorderHoverBrush}" />
                     </Trigger>
                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
                         <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
@@ -38,8 +38,8 @@
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="20" />
-                <RowDefinition Height="4" />
+                <RowDefinition x:Name="TitleRow" Height="20" />
+                <RowDefinition x:Name="GapRow" Height="4" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -48,7 +48,7 @@
                 element, so its content (the large icon) is only visible when no thumbnail is
                 drawn: preview unavailable, or DWM has nothing for the window.
             -->
-            <Border x:Name="ThumbHost" Grid.Row="2" CornerRadius="6" Background="Transparent">
+            <Border x:Name="ThumbHost" Grid.Row="2" CornerRadius="{DynamicResource ThumbCornerRadius}" Background="Transparent">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     <Image Width="40" Height="40" Opacity="0.6" Source="{Binding Icon}"
                            Visibility="{Binding Icon, Converter={StaticResource NullToCollapsed}}" />
@@ -60,7 +60,7 @@
                 </StackPanel>
             </Border>
 
-            <Grid Grid.Row="0">
+            <Grid x:Name="TitleBar" Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="16" />
                     <ColumnDefinition Width="6" />

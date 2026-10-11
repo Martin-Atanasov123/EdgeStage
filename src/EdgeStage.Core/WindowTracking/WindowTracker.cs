@@ -37,6 +37,7 @@ public sealed unsafe class WindowTracker : IDisposable
     private readonly uint _flags;
     private nint _foregroundHook;
     private readonly List<nint> _detailHooks = [];
+    private int _detailUsers;
     private bool _disposed;
 
     /// <param name="includeOwnProcess">Also report EdgeStage's own windows (tests only).</param>
@@ -63,9 +64,14 @@ public sealed unsafe class WindowTracker : IDisposable
             Log.Warn("WindowTracker: foreground hook could not be installed; MRU order falls back to Z-order.");
     }
 
+    /// <summary>
+    /// Installs the detailed hooks. Calls are counted (the sidebar and Exposé can overlap briefly);
+    /// the hooks stay until every <see cref="BeginDetailedTracking"/> has its <see cref="EndDetailedTracking"/>.
+    /// </summary>
     public void BeginDetailedTracking()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        _detailUsers++;
         if (_detailHooks.Count > 0)
             return;
         // Narrow ranges keep unrelated accessibility events (focus, selection, value changes…) away.
@@ -88,6 +94,10 @@ public sealed unsafe class WindowTracker : IDisposable
 
     public void EndDetailedTracking()
     {
+        if (_detailUsers > 0)
+            _detailUsers--;
+        if (_detailUsers > 0 && !_disposed)
+            return;
         foreach (nint hook in _detailHooks)
             Uninstall(hook);
         _detailHooks.Clear();

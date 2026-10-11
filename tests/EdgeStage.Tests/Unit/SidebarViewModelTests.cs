@@ -1,3 +1,4 @@
+using EdgeStage.Core.Layout;
 using EdgeStage.Core.WindowTracking;
 using EdgeStage.UI;
 
@@ -106,9 +107,10 @@ public sealed class SidebarViewModelTests
     [TestMethod]
     public void ContentHeight_MatchesCardPitchPlusPadding()
     {
-        // 8 top padding + n × (180 card + 6 spacing) + 2 bottom (8 − 6) + 2 border
-        Assert.AreEqual(8 + 4 * 186 + 2 + 2, Loaded(4).ContentHeightDip, 1e-9);
-        Assert.AreEqual(SidebarViewModel.EmptyHeight, new SidebarViewModel().ContentHeightDip, 1e-9);
+        // 44 search bar + 8 top padding + n × (card + 6 spacing) + 2 bottom (8 − 6) + 2 border
+        double card = CardMetrics.Default.CardHeight;
+        Assert.AreEqual(44 + 8 + 4 * (card + 6) + 2 + 2, Loaded(4).ContentHeightDip, 1e-9);
+        Assert.AreEqual(44 + 120, new SidebarViewModel().ContentHeightDip, 1e-9);
     }
 
     [TestMethod]

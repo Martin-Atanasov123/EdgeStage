@@ -31,10 +31,6 @@ public enum SidebarOpenMode
 /// </summary>
 public partial class SidebarWindow : Window
 {
-    public static readonly Thickness ListMargin = new(
-        SidebarViewModel.ListPadding, SidebarViewModel.ListPadding,
-        SidebarViewModel.ListPadding, SidebarViewModel.ListPadding - SidebarViewModel.CardSpacing);
-
     private const double ShowDurationMs = 180;
     private const double HideDurationMs = 140;
     private const double SlideDistanceDip = 24;
@@ -61,6 +57,7 @@ public partial class SidebarWindow : Window
     private long _outsideSinceMs = -1;
     private bool _activating;
     private readonly ZoomOverlay _zoom = new();
+    private readonly HoverGuard _hover = new();
     private readonly CornerMaskWindow _mask;
     private AppSettings _settings = AppSettings.Default;
 
@@ -96,19 +93,20 @@ public partial class SidebarWindow : Window
         _vm.Cards.CollectionChanged += OnCardsChanged;
         _vm.PropertyChanged += (_, e) =>
         {
-            // The corner shapes take the card's hover/selected color.
+            if (e.PropertyName == nameof(SidebarViewModel.Filter))
+                ShowFilterText();
             if (!IsOpen)
                 return;
+            // The corner shapes take the card's hover/selected color.
             if (e.PropertyName == nameof(SidebarViewModel.SelectedIndex))
                 _thumbs.Update();
-            else if (e.PropertyName == nameof(SidebarViewModel.HasFilter) || e.PropertyName == nameof(SidebarViewModel.Filter))
+            else if (e.PropertyName == nameof(SidebarViewModel.ContentHeightDip))
             {
-                FilterBar.Visibility = _vm.HasFilter ? Visibility.Visible : Visibility.Collapsed;
-                FilterText.Text = _vm.Filter;
                 PlaceWindow();
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, _thumbs.Update);
             }
         };
+        ApplyMetrics(CardMetrics.Default);
         Deactivated += (_, _) =>
         {
             if (IsOpen && Mode == SidebarOpenMode.Hotkey)
@@ -139,6 +137,36 @@ public partial class SidebarWindow : Window
     /// <summary>The user chose "Never show this app" for the given process name.</summary>
     public event Action<string>? HideAppRequested;
 
+    /// <summary>The Exposé button in the header was clicked.</summary>
+    public event Action? ExposeRequested;
+
+    /// <summary>An edge-opened sidebar took the keyboard (search box clicked); Esc now arrives as a key press.</summary>
+    public event Action? KeyboardTaken;
+
+    /// <summary>Sizes the cards, list and panel from the appearance settings.</summary>
+    public void ApplyMetrics(CardMetrics metrics)
+    {
+        _vm.Metrics = metrics;
+        Resources["CardCornerRadius"] = new CornerRadius(metrics.CornerRadius);
+        Resources["ThumbCornerRadius"] = new CornerRadius(metrics.ThumbCornerRadius);
+        Resources["CardPaddingThickness"] = new Thickness(metrics.CardPadding);
+        Resources["SidebarCardHeight"] = metrics.CardHeight;
+        Resources["CardSpacingMargin"] = new Thickness(0, 0, 0, metrics.CardSpacing);
+        CardList.Margin = new Thickness(metrics.ListPadding, metrics.ListPadding, metrics.ListPadding, metrics.ListBottomMargin);
+        _mask.Radius = metrics.ThumbCornerRadius > 0 ? metrics.ThumbCornerRadius + 1 : 0;
+        if (IsOpen)
+        {
+            PlaceWindow();
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, _thumbs.Update);
+        }
+    }
+
+    private void ShowFilterText()
+    {
+        FilterText.Text = _vm.Filter;
+        SearchPlaceholder.Visibility = _vm.HasFilter ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     // ---- open / dismiss --------------------------------------------------------------------------
 
     public void Open(SidebarOpenMode mode, MonitorArea monitor, AppSettings settings)
@@ -153,7 +181,8 @@ public partial class SidebarWindow : Window
         _edge = settings.Edge;
         _dismissDelayMs = settings.DismissDelayMs;
         _settings = settings;
-        FilterBar.Visibility = Visibility.Collapsed;
+        _vm.Filter = "";
+        ShowFilterText();
 
         // Capture the foreground window before EdgeStage itself appears.
         nint foreground = User32.GetForegroundWindow();
@@ -205,6 +234,7 @@ public partial class SidebarWindow : Window
                      $"{_vm.Cards.Count} windows, {_thumbs.Count} live thumbnails.");
         });
 
+        _hover.Arm();
         _pointerEntered = mode == SidebarOpenMode.Edge; // the pointer is at the edge already
         _outsideSinceMs = -1;
         _pointerTimer.Start();
@@ -308,7 +338,7 @@ public partial class SidebarWindow : Window
         if (_monitor is null)
             return;
         double scale = _monitor.Scale;
-        RECT panel = SidebarPlacement.Compute(_monitor, _edge, _vm.ContentHeightDip);
+        RECT panel = SidebarPlacement.Compute(_monitor, _edge, _vm.ContentHeightDip, _vm.Metrics.SidebarWidth);
         int shadow = (int)Math.Round(ShadowDip * scale);
         RECT work = _monitor.WorkArea;
 
@@ -543,11 +573,7 @@ public partial class SidebarWindow : Window
         if ((e.OriginalSource as FrameworkElement)?.DataContext is not CardViewModel card)
             return;
         e.Handled = true;
-        // Same as clicking the window's own close button: the app may ask to save first.
-        if (!User32.PostMessage(card.Hwnd, WM_CLOSE, 0, 0))
-            Log.Warn($"Could not post WM_CLOSE to 0x{card.Hwnd:X} ({card.ProcessName}).");
-        else
-            Log.Info($"Asked {card.ProcessName} (0x{card.Hwnd:X}) to close.");
+        WindowActions.RequestClose(card);
     }
 
     private void OnHideAppRequested(object sender, RoutedEventArgs e)
@@ -566,14 +592,41 @@ public partial class SidebarWindow : Window
 
     private void ScrollSelectedIntoView()
     {
-        if (_vm.SelectedIndex >= 0 && CardList.ItemContainerGenerator.ContainerFromIndex(_vm.SelectedIndex) is FrameworkElement container)
+        if (_vm.Selected is { } card && CardList.ItemContainerGenerator.ContainerFromItem(card) is FrameworkElement container)
             container.BringIntoView();
+    }
+
+    private void OnGroupHeaderClicked(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: GroupHeaderViewModel header })
+            _vm.ToggleGroup(header);
+    }
+
+    private void OnExposeClicked(object sender, RoutedEventArgs e) => ExposeRequested?.Invoke();
+
+    /// <summary>
+    /// Clicking the search box of an edge-opened sidebar (which never takes focus on its own) lets it
+    /// take the keyboard so the user can type.
+    /// </summary>
+    private void OnSearchBoxClicked(object sender, MouseButtonEventArgs e)
+    {
+        if (!IsOpen || Mode == SidebarOpenMode.Hotkey)
+            return;
+        Mode = SidebarOpenMode.Hotkey;
+        SetExStyle(WS_EX_NOACTIVATE, false);
+        Activate();
+        Focus();
+        Log.Debug("Sidebar took keyboard focus for search.");
+        KeyboardTaken?.Invoke();
     }
 
     private void OnCardMouseEnter(object sender, MouseEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: CardViewModel card })
-            _vm.SelectedIndex = _vm.Cards.IndexOf(card);
+        if (!_hover.Allows() || sender is not FrameworkElement { DataContext: CardViewModel card })
+            return;
+        int index = _vm.Cards.IndexOf(card);
+        if (index != _vm.SelectedIndex)
+            _vm.SelectedIndex = index;
     }
 
     private void OnCardClicked(object sender, MouseButtonEventArgs e)
@@ -583,6 +636,10 @@ public partial class SidebarWindow : Window
     }
 
 #if DEBUG
+    /// <summary>Same path as clicking the header's Exposé button.</summary>
+    internal void ClickExposeButtonForTest() =>
+        ExposeButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, ExposeButton));
+
     internal void ActivateSelectedForTest()
     {
         if (_vm.Selected is { } card)

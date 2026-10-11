@@ -34,9 +34,11 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
     private readonly WindowTracker _tracker = new();
     private readonly EdgeTriggerService _edge;
     private readonly SidebarWindow _sidebar;
+    private readonly ExposeWindow _expose;
     private readonly TrayIcon _tray;
     private SettingsWindow? _settingsWindow;
     private MonitorLayout _layout;
+    private int _sidebarMonitor;
     private readonly DispatcherTimer _holdWatcher;
     private bool _hotkeySuspended;
     private bool _sessionLocked;
@@ -62,10 +64,23 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
 
         _sidebar = new SidebarWindow(_tracker);
         _sidebar.Dismissed += OnSidebarDismissed;
+        _sidebar.KeyboardTaken += () => _hotkeys.Unregister(EscapeHotkeyId);
         _sidebar.HideAppRequested += app =>
         {
             Log.Info($"Hiding app '{app}' from the sidebar.");
             UpdateSettings(Settings with { ExcludedApps = [.. Settings.ExcludedApps, app] });
+        };
+        _expose = new ExposeWindow(_tracker);
+        _expose.Dismissed += OnExposeDismissed;
+        _expose.HideAppRequested += app =>
+        {
+            Log.Info($"Hiding app '{app}' (from Exposé).");
+            UpdateSettings(Settings with { ExcludedApps = [.. Settings.ExcludedApps, app] });
+        };
+        _sidebar.ExposeRequested += () =>
+        {
+            _sidebar.Dismiss("opening Exposé", immediate: true);
+            ShowExpose(_sidebarMonitor); // same monitor as the sidebar
         };
         _holdWatcher = new DispatcherTimer(TimeSpan.FromMilliseconds(30), DispatcherPriority.Input, OnHoldTick, _dispatcher);
         _holdWatcher.Stop();
@@ -74,9 +89,8 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         _tray.Invoked += () => ShowSidebar(SidebarOpenMode.Hotkey);
         _tray.ContextMenuRequested += () => TrayMenu.Show(this);
         _tray.BalloonClicked += OpenSettings;
-        _sidebar.ActivationFailed += (title, result) => _tray.ShowBalloon($"Couldn't switch to {title}",
-            result.TargetElevated ? "That window runs as administrator, which Windows does not let EdgeStage switch to."
-                                  : "Windows did not allow the switch.", warning: true);
+        _sidebar.ActivationFailed += OnActivationFailed;
+        _expose.ActivationFailed += OnActivationFailed;
     }
 
     public AppSettings Settings { get; private set; }
@@ -122,6 +136,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
 
         int index = monitorIndex ?? (User32.GetCursorPos(out POINT p) ? _layout.IndexOf(p) : 0);
         index = Math.Clamp(index, 0, _layout.Monitors.Count - 1);
+        _sidebarMonitor = index;
 
         _edge.Pause();
         if (mode == SidebarOpenMode.Edge)
@@ -131,6 +146,49 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             Log.Info(esc.Succeeded ? "Esc reserved while the edge-opened sidebar is visible." : $"Esc could not be reserved: {esc.Status}.");
         }
         _sidebar.Open(mode, _layout.Monitors[index], Settings);
+    }
+
+    private void OnActivationFailed(string title, ActivationResult result) =>
+        _tray.ShowBalloon($"Couldn't switch to {title}",
+            result.TargetElevated ? "That window runs as administrator, which Windows does not let EdgeStage switch to."
+                                  : "Windows did not allow the switch.", warning: true);
+
+    // ---- Exposé ----------------------------------------------------------------------------------------
+
+    public bool IsExposeOpen => _expose.IsOpen;
+
+    /// <summary>Opens Exposé on the pointer's monitor (or the given one).</summary>
+    public void ShowExpose(int? monitorIndex = null)
+    {
+        if (_expose.IsOpen || _sessionLocked || _layout.Monitors.Count == 0)
+            return;
+        if (_sidebar.IsOpen)
+            _sidebar.Dismiss("opening Exposé", immediate: true);
+        int index = monitorIndex ?? (User32.GetCursorPos(out POINT p) ? _layout.IndexOf(p) : 0);
+        index = Math.Clamp(index, 0, _layout.Monitors.Count - 1);
+        _edge.Pause();
+        ExposeOptions options = ExposeOptions.Default;
+#if DEBUG
+        // Slow motion for animation captures in validation scripts.
+        if (double.TryParse(Environment.GetEnvironmentVariable("EDGESTAGE_TEST_ANIMATION_SCALE"),
+                System.Globalization.CultureInfo.InvariantCulture, out double animationScale))
+            options = options with { AnimationScale = animationScale };
+#endif
+        _expose.Open(_layout.Monitors[index], Settings, options);
+    }
+
+    public void ToggleExpose()
+    {
+        if (_expose.IsOpen)
+            _expose.Dismiss("hotkey pressed again");
+        else
+            ShowExpose();
+    }
+
+    private void OnExposeDismissed(string reason)
+    {
+        if (!_disposed && !_sessionLocked && !_sidebar.IsOpen)
+            _edge.Resume();
     }
 
     /// <summary>Hold-to-switch needs at least one modifier to hold.</summary>
@@ -223,6 +281,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         bool edgeChanged = settings.Edge != Settings.Edge;
         Persist(settings);
         _sidebar.ApplySettings(Settings);
+        _expose.ApplySettings(Settings);
         _edge.Configure(settings.EdgeActivationEnabled, settings.Edge, settings.ActivationDelayMs);
         if (edgeChanged)
             _sidebar.Dismiss("edge changed", immediate: true);
@@ -387,9 +446,39 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             TrayMenu.Show(this, new System.Windows.Point(800, 80));
             return true;
         }
+        if (message == SingleInstance.TestCommandMessage)
+        {
+            RunTestCommand((SingleInstance.TestCommand)(int)wParam);
+            return true;
+        }
 #endif
         return false;
     }
+
+#if DEBUG
+    /// <summary>Tests draw over a backdrop on the primary monitor, wherever the pointer is.</summary>
+    private int PrimaryMonitorIndex => Math.Max(0, _layout.Monitors.ToList().FindIndex(m => m.IsPrimary));
+
+    private void RunTestCommand(SingleInstance.TestCommand command)
+    {
+        Log.Info($"Test command {command}.");
+        switch (command)
+        {
+            case SingleInstance.TestCommand.ExposeShow: ShowExpose(PrimaryMonitorIndex); break;
+            case SingleInstance.TestCommand.ExposeActivateSelected: _expose.ActivateSelectedForTest(); break;
+            case SingleInstance.TestCommand.ExposeEscape: _expose.Dismiss("escape (test)"); break;
+            case SingleInstance.TestCommand.ExposeRight: _expose.SelectForTest("right"); break;
+            case SingleInstance.TestCommand.ExposeLeft: _expose.SelectForTest("left"); break;
+            case SingleInstance.TestCommand.ExposeUp: _expose.SelectForTest("up"); break;
+            case SingleInstance.TestCommand.ExposeDown: _expose.SelectForTest("down"); break;
+            case SingleInstance.TestCommand.ExposeDescribe: Log.Info("Exposé state: " + _expose.DescribeForTest()); break;
+            case SingleInstance.TestCommand.SidebarExposeButton:
+                ShowSidebar(SidebarOpenMode.Hotkey, PrimaryMonitorIndex);
+                _dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => _sidebar.ClickExposeButtonForTest());
+                break;
+        }
+    }
+#endif
 
     private void OnHotkeyPressed(int id)
     {
@@ -414,6 +503,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             _layout = MonitorLayout.Load();
             _edge.UpdateLayout(_layout);
             _sidebar.Dismiss("display configuration changed", immediate: true);
+            _expose.Dismiss("display configuration changed", immediate: true);
             Log.Info($"Display configuration changed: {DescribeMonitors()}");
         });
     }
@@ -429,6 +519,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
                 case SessionSwitchReason.SessionLock or SessionSwitchReason.ConsoleDisconnect or SessionSwitchReason.RemoteDisconnect:
                     _sessionLocked = true;
                     _sidebar.Dismiss("session locked", immediate: true);
+                    _expose.Dismiss("session locked", immediate: true);
                     _edge.Pause();
                     Log.Info($"Session {e.Reason}: sidebar hidden, edge polling paused.");
                     break;
@@ -473,6 +564,8 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         TrayMenu.CloseOpenMenu();
         _sidebar.Dismiss("exit", immediate: true);
         _sidebar.Close();
+        _expose.Dismiss("exit", immediate: true);
+        _expose.Close();
         _edge.Dispose();
         _hotkeys.Dispose();
         _tracker.Dispose();

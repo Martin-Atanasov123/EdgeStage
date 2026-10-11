@@ -20,8 +20,8 @@ namespace EdgeStage.UI;
 /// </remarks>
 internal sealed class CornerMaskWindow : Window
 {
-    /// <summary>Corner radius in DIPs; concentric with the 10 DIP card radius and 5 DIP padding.</summary>
-    public const double Radius = 6;
+    /// <summary>Default corner radius in DIPs; concentric with the 10 DIP card radius and 5 DIP padding.</summary>
+    public const double DefaultRadius = 6;
 
     public static readonly Color Normal = Color.FromRgb(0x27, 0x27, 0x2A);
     public static readonly Color Hover = Color.FromRgb(0x32, 0x32, 0x36);
@@ -29,9 +29,10 @@ internal sealed class CornerMaskWindow : Window
     /// <param name="Destination">Where the preview is drawn, in the sidebar window's device pixels.</param>
     public readonly record struct Item(RECT Destination, bool RoundTop, bool RoundBottom, bool Highlighted);
 
-    private static readonly Geometry[] Corners = BuildCorners(Radius); // TL, TR, BL, BR
-    private static readonly SolidColorBrush NormalBrush = Frozen(Normal);
-    private static readonly SolidColorBrush HoverBrush = Frozen(Hover);
+    private Geometry[] _corners = BuildCorners(DefaultRadius); // TL, TR, BL, BR
+    private double _radius = DefaultRadius;
+    private SolidColorBrush _normalBrush = Frozen(Normal);
+    private SolidColorBrush _hoverBrush = Frozen(Hover);
 
     private readonly Canvas _canvas = new();
     private readonly List<Path> _paths = [];
@@ -59,6 +60,27 @@ internal sealed class CornerMaskWindow : Window
         _hwnd = helper.EnsureHandle();
         long ex = User32.GetWindowLongPtr(_hwnd, GWL_EXSTYLE);
         User32.SetWindowLongPtr(_hwnd, GWL_EXSTYLE, (nint)(ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT));
+    }
+
+    /// <summary>Corner radius in DIPs (follows the card corner radius setting); 0 disables the mask.</summary>
+    public double Radius
+    {
+        get => _radius;
+        set
+        {
+            value = Math.Max(0, value);
+            if (value == _radius)
+                return;
+            _radius = value;
+            _corners = BuildCorners(Math.Max(value, 0.5));
+        }
+    }
+
+    /// <summary>The card background colors the corner shapes must match.</summary>
+    public void SetColors(Color normal, Color highlighted)
+    {
+        _normalBrush = Frozen(normal);
+        _hoverBrush = Frozen(highlighted);
     }
 
     /// <summary>Covers exactly the sidebar window (screen device pixels).</summary>
@@ -91,13 +113,15 @@ internal sealed class CornerMaskWindow : Window
             _canvas.Children.Add(path);
         }
 
-        double r = Radius;
+        double r = _radius;
         int used = 0;
+        if (r <= 0)
+            items = [];
         foreach (Item item in items)
         {
             double left = item.Destination.Left / scale, top = item.Destination.Top / scale;
             double right = item.Destination.Right / scale, bottom = item.Destination.Bottom / scale;
-            Brush brush = item.Highlighted ? HoverBrush : NormalBrush;
+            Brush brush = item.Highlighted ? _hoverBrush : _normalBrush;
 
             Set(used++, 0, left, top, brush, item.RoundTop);
             Set(used++, 1, right - r, top, brush, item.RoundTop);
@@ -114,7 +138,7 @@ internal sealed class CornerMaskWindow : Window
         path.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (!visible)
             return;
-        path.Data = Corners[corner];
+        path.Data = _corners[corner];
         path.Fill = brush;
         Canvas.SetLeft(path, x);
         Canvas.SetTop(path, y);

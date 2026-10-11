@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using EdgeStage.Core.Layout;
 using EdgeStage.Core.WindowTracking;
 
 namespace EdgeStage.UI;
@@ -23,7 +24,7 @@ public abstract class ObservableObject : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-/// <summary>One preview card. Identity is the window handle; everything else can change while the sidebar is open.</summary>
+/// <summary>One preview card. Identity is the window handle; everything else can change while the list is open.</summary>
 public sealed class CardViewModel : ObservableObject
 {
     private string _title;
@@ -45,11 +46,14 @@ public sealed class CardViewModel : ObservableObject
     public nint Hwnd { get; }
     public string ProcessName { get; }
 
+    /// <summary>Grouping key: the app's process name (case-insensitive), or the title for unknown processes.</summary>
+    public string GroupKey => ProcessName.Length > 0 ? ProcessName.ToLowerInvariant() : "?";
+
     public string Title { get => _title; set => Set(ref _title, value); }
     public ImageSource? Icon { get => _icon; set => Set(ref _icon, value); }
     public bool IsMinimized { get => _isMinimized; set => Set(ref _isMinimized, value); }
 
-    /// <summary>The window that was in the foreground when the sidebar opened.</summary>
+    /// <summary>The window that was in the foreground when the list opened.</summary>
     public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
 
     /// <summary>Keyboard/hover selection.</summary>
@@ -68,29 +72,55 @@ public sealed class CardViewModel : ObservableObject
         || ProcessName.Contains(filter, StringComparison.CurrentCultureIgnoreCase);
 }
 
-/// <summary>
-/// The card list. Order is fixed while the sidebar is open: new windows are appended, closed ones
-/// removed, nothing is reshuffled under the user's pointer. <see cref="Cards"/> is what is shown
-/// (after the type-to-filter text is applied); the full list is kept privately.
-/// </summary>
-public sealed class SidebarViewModel : ObservableObject
+/// <summary>Header of an application group (only present when grouping is on).</summary>
+public sealed class GroupHeaderViewModel : ObservableObject
 {
-    // Layout constants (DIPs) shared with the XAML templates.
-    public const double ListPadding = 8;
-    public const double CardHeight = 180;   // border 1.5 + 5 padding + 20 title + 4 gap + 143 thumbnail + 5 padding + 1.5 border
-    public const double CardSpacing = 6;
-    public const double EmptyHeight = 120;
-    public const double FilterBarHeight = 36;
+    private bool _isCollapsed;
+    private int _count;
+    private ImageSource? _icon;
 
+    public GroupHeaderViewModel(string key, string appName)
+    {
+        Key = key;
+        AppName = appName;
+    }
+
+    public string Key { get; }
+    public string AppName { get; }
+    public ImageSource? Icon { get => _icon; set => Set(ref _icon, value); }
+
+    /// <summary>Windows of this app that match the current filter.</summary>
+    public int Count { get => _count; set { if (Set(ref _count, value)) Raise(nameof(Summary)); } }
+
+    public bool IsCollapsed { get => _isCollapsed; set { if (Set(ref _isCollapsed, value)) Raise(nameof(Summary)); } }
+
+    public string Summary => _count == 1 ? "1 window" : $"{_count} windows";
+}
+
+/// <summary>
+/// The window list shared by the sidebar and Exposé: filtering (type-to-search), selection and
+/// optional grouping by application. <see cref="Items"/> is what is displayed (group headers and
+/// cards, in order); <see cref="Cards"/> are the selectable cards in the same order. Nothing is
+/// reshuffled while the list is open: new windows join their group (or the end), closed ones leave.
+/// </summary>
+public class WindowListViewModel : ObservableObject
+{
     private readonly List<CardViewModel> _all = [];
+    private readonly Dictionary<string, GroupHeaderViewModel> _groups = new(StringComparer.Ordinal);
     private int _selectedIndex = -1;
     private string _filter = "";
+    private bool _grouping;
 
     public ObservableCollection<CardViewModel> Cards { get; } = [];
 
+    /// <summary>Display list: <see cref="GroupHeaderViewModel"/> and <see cref="CardViewModel"/> items.</summary>
+    public ObservableCollection<object> Items { get; } = [];
+
     public bool IsEmpty => Cards.Count == 0;
 
-    /// <summary>Type-to-filter text; empty shows every window.</summary>
+    public int GroupCount => Items.Count(i => i is GroupHeaderViewModel);
+
+    /// <summary>Type-to-search text; empty shows every window.</summary>
     public string Filter
     {
         get => _filter;
@@ -99,18 +129,27 @@ public sealed class SidebarViewModel : ObservableObject
             value ??= "";
             if (value == _filter)
                 return;
-            CardViewModel? keep = Selected;
             _filter = value;
-            ApplyFilter();
-            // Keep the same card selected if it is still shown, otherwise the first match.
-            SelectedIndex = keep is not null && Cards.Contains(keep) ? Cards.IndexOf(keep) : (Cards.Count > 0 ? 0 : -1);
-            RaiseFilterState();
+            Rebuild(keepSelection: true, selectFirstIfLost: true);
         }
     }
 
     public bool HasFilter => _filter.Length > 0;
 
     public string EmptyMessage => HasFilter ? "No matching windows" : "No other open windows";
+
+    /// <summary>Group cards by application (collapsible). Every window stays individually selectable.</summary>
+    public bool Grouping
+    {
+        get => _grouping;
+        set
+        {
+            if (_grouping == value)
+                return;
+            _grouping = value;
+            Rebuild(keepSelection: true, selectFirstIfLost: false);
+        }
+    }
 
     public int SelectedIndex
     {
@@ -126,54 +165,50 @@ public sealed class SidebarViewModel : ObservableObject
 
     public CardViewModel? Selected => _selectedIndex >= 0 && _selectedIndex < Cards.Count ? Cards[_selectedIndex] : null;
 
-    /// <summary>Height the card list needs, used to size the floating sidebar.</summary>
-    /// <remarks>Each card carries its spacing as a bottom margin; the list's bottom margin is reduced by the
-    /// same amount so the panel has equal padding top and bottom.</remarks>
-    public double ContentHeightDip => (HasFilter ? FilterBarHeight : 0) + (Cards.Count == 0
-        ? EmptyHeight
-        : ListPadding + Cards.Count * (CardHeight + CardSpacing) + (ListPadding - CardSpacing) + 2 /* panel border */);
+    public IEnumerable<CardViewModel> AllCards => _all;
 
     public void Load(IEnumerable<WindowInfo> ordered, nint foreground, int initialSelection)
     {
         _filter = "";
         _all.Clear();
-        Cards.Clear();
+        _groups.Clear();
         foreach (WindowInfo info in ordered)
-        {
-            var card = new CardViewModel(info) { IsActive = info.Hwnd == foreground };
-            _all.Add(card);
-            Cards.Add(card);
-        }
+            _all.Add(new CardViewModel(info) { IsActive = info.Hwnd == foreground });
+        Items.Clear();
+        Cards.Clear();
+        Rebuild(keepSelection: false, selectFirstIfLost: false);
         SelectedIndex = initialSelection;
-        RaiseFilterState();
     }
 
-    /// <summary>Finds a card among all windows, including ones hidden by the filter.</summary>
+    /// <summary>Finds a card among all windows, including ones hidden by the filter or a collapsed group.</summary>
     public CardViewModel? Find(nint hwnd) => _all.FirstOrDefault(c => c.Hwnd == hwnd);
+
+    public GroupHeaderViewModel? GroupOf(CardViewModel card) => _groups.GetValueOrDefault(card.GroupKey);
 
     public CardViewModel Append(WindowInfo info)
     {
         var card = new CardViewModel(info);
         _all.Add(card);
-        if (card.Matches(_filter))
-            Cards.Add(card);
-        Raise(nameof(IsEmpty));
+        Rebuild(keepSelection: true, selectFirstIfLost: false);
         return card;
     }
 
     public void Remove(CardViewModel card)
     {
-        _all.Remove(card);
-        int index = Cards.IndexOf(card);
-        if (index < 0)
+        if (!_all.Remove(card))
             return;
+        int index = Cards.IndexOf(card);
         CardViewModel? selected = Selected;
-        Cards.RemoveAt(index);
-        // Keep the same card selected; if the selected card itself went away, select its neighbor.
-        SelectedIndex = selected is not null && selected != card
-            ? Cards.IndexOf(selected)
-            : Math.Min(index, Cards.Count - 1);
-        Raise(nameof(IsEmpty));
+        Rebuild(keepSelection: true, selectFirstIfLost: false);
+        // If the selected card itself went away, select its neighbor.
+        if (selected == card && Cards.Count > 0)
+            SelectedIndex = Math.Min(Math.Max(index, 0), Cards.Count - 1);
+    }
+
+    public void ToggleGroup(GroupHeaderViewModel group)
+    {
+        group.IsCollapsed = !group.IsCollapsed;
+        Rebuild(keepSelection: true, selectFirstIfLost: false);
     }
 
     public void MoveSelection(int delta)
@@ -202,31 +237,141 @@ public sealed class SidebarViewModel : ObservableObject
     public void Clear()
     {
         _all.Clear();
+        _groups.Clear();
+        Items.Clear();
         Cards.Clear();
         _filter = "";
         _selectedIndex = -1;
         Raise(nameof(SelectedIndex));
-        RaiseFilterState();
+        RaiseListState();
     }
 
-    private void RaiseFilterState()
+    /// <summary>Group sizes in display order (expanded groups only), for grid layout.</summary>
+    public IReadOnlyList<int> VisibleGroupSizes()
+    {
+        if (!_grouping)
+            return [Cards.Count];
+        var sizes = new List<int>();
+        int current = -1;
+        foreach (object item in Items)
+        {
+            if (item is GroupHeaderViewModel)
+            {
+                if (current >= 0)
+                    sizes.Add(current);
+                current = 0;
+            }
+            else if (current >= 0)
+            {
+                current++;
+            }
+        }
+        if (current >= 0)
+            sizes.Add(current);
+        return sizes;
+    }
+
+    protected virtual void OnListChanged()
+    {
+    }
+
+    private void Rebuild(bool keepSelection, bool selectFirstIfLost)
+    {
+        CardViewModel? keep = keepSelection ? Selected : null;
+        List<CardViewModel> matching = _all.Where(c => c.Matches(_filter)).ToList();
+
+        var items = new List<object>();
+        var cards = new List<CardViewModel>();
+        if (!_grouping)
+        {
+            items.AddRange(matching);
+            cards.AddRange(matching);
+        }
+        else
+        {
+            // Groups ordered by their most recently used window; windows keep MRU order inside.
+            foreach (var group in matching.GroupBy(c => c.GroupKey))
+            {
+                CardViewModel first = group.First();
+                if (!_groups.TryGetValue(group.Key, out GroupHeaderViewModel? header))
+                {
+                    header = new GroupHeaderViewModel(group.Key, first.ProcessName.Length > 0 ? first.ProcessName : first.Title);
+                    _groups[group.Key] = header;
+                }
+                header.Count = group.Count();
+                header.Icon ??= group.Select(c => c.Icon).FirstOrDefault(i => i is not null);
+                items.Add(header);
+                // While searching, matches are shown even inside collapsed groups.
+                if (!header.IsCollapsed || HasFilter)
+                {
+                    items.AddRange(group);
+                    cards.AddRange(group);
+                }
+            }
+        }
+
+        Sync(Items, items);
+        Sync(Cards, cards);
+
+        int index = keep is not null ? Cards.IndexOf(keep) : -1;
+        if (index < 0 && selectFirstIfLost)
+            index = Cards.Count > 0 ? 0 : -1; // the selected card was filtered out: take the first match
+        SelectedIndex = index;
+        RaiseListState();
+        OnListChanged();
+    }
+
+    private void RaiseListState()
     {
         Raise(nameof(Filter));
         Raise(nameof(HasFilter));
         Raise(nameof(IsEmpty));
         Raise(nameof(EmptyMessage));
-        Raise(nameof(ContentHeightDip));
+        Raise(nameof(GroupCount));
     }
 
-    private void ApplyFilter()
+    /// <summary>Makes <paramref name="target"/> equal <paramref name="desired"/> with minimal moves (keeps containers alive).</summary>
+    private static void Sync<T>(ObservableCollection<T> target, IList<T> desired) where T : class
     {
-        List<CardViewModel> wanted = _all.Where(c => c.Matches(_filter)).ToList();
-        var wantedSet = new HashSet<CardViewModel>(wanted);
-        for (int i = Cards.Count - 1; i >= 0; i--)
-            if (!wantedSet.Contains(Cards[i]))
-                Cards.RemoveAt(i);
-        for (int i = 0; i < wanted.Count; i++)
-            if (i >= Cards.Count || !ReferenceEquals(Cards[i], wanted[i]))
-                Cards.Insert(i, wanted[i]);
+        var wanted = new HashSet<T>(desired, ReferenceEqualityComparer.Instance);
+        for (int i = target.Count - 1; i >= 0; i--)
+            if (!wanted.Contains(target[i]))
+                target.RemoveAt(i);
+        for (int i = 0; i < desired.Count; i++)
+        {
+            if (i < target.Count && ReferenceEquals(target[i], desired[i]))
+                continue;
+            int existing = -1;
+            for (int j = i + 1; j < target.Count; j++)
+                if (ReferenceEquals(target[j], desired[i])) { existing = j; break; }
+            if (existing >= 0)
+                target.Move(existing, i);
+            else
+                target.Insert(i, desired[i]);
+        }
     }
+}
+
+/// <summary>The sidebar's list plus its size, which depends on the card metrics.</summary>
+public sealed class SidebarViewModel : WindowListViewModel
+{
+    private CardMetrics _metrics = CardMetrics.Default;
+
+    public CardMetrics Metrics
+    {
+        get => _metrics;
+        set
+        {
+            if (Set(ref _metrics, value))
+                Raise(nameof(ContentHeightDip));
+        }
+    }
+
+    /// <summary>Whether the search/header bar is shown at the top of the sidebar.</summary>
+    public bool ShowSearchBar { get; set; } = true;
+
+    /// <summary>Height the list needs, used to size the floating sidebar.</summary>
+    public double ContentHeightDip => _metrics.ContentHeight(Cards.Count, GroupCount, ShowSearchBar);
+
+    protected override void OnListChanged() => Raise(nameof(ContentHeightDip));
 }

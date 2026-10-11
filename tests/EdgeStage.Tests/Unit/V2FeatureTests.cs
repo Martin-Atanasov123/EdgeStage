@@ -1,3 +1,4 @@
+using EdgeStage.Core.Layout;
 using EdgeStage.Core.Settings;
 using EdgeStage.Core.WindowTracking;
 using EdgeStage.UI;
@@ -161,14 +162,15 @@ public sealed class TypeToFilterTests
     }
 
     [TestMethod]
-    public void FilterBar_AddsHeight_OnlyWhileFiltering()
+    public void Filtering_ShrinksTheSidebar_ToTheMatchingCards()
     {
         var vm = Loaded();
         double plain = vm.ContentHeightDip;
+        CardMetrics m = vm.Metrics;
 
         vm.Filter = "quarterly";   // 2 of 4 cards
-        double expected = SidebarViewModel.FilterBarHeight + 8 + 2 * 186 + 2 + 2;
-        Assert.AreEqual(expected, vm.ContentHeightDip, 1e-9);
+        Assert.AreEqual(m.ContentHeight(2, 0, searchBar: true), vm.ContentHeightDip, 1e-9);
+        Assert.IsTrue(vm.ContentHeightDip < plain);
 
         vm.Filter = "";
         Assert.AreEqual(plain, vm.ContentHeightDip, 1e-9);

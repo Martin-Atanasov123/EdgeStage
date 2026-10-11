@@ -18,6 +18,23 @@ public partial class PreviewCard : UserControl
     public event RoutedEventHandler CloseRequested { add => AddHandler(CloseRequestedEvent, value); remove => RemoveHandler(CloseRequestedEvent, value); }
     public event RoutedEventHandler HideAppRequested { add => AddHandler(HideAppRequestedEvent, value); remove => RemoveHandler(HideAppRequestedEvent, value); }
 
+    /// <summary>Show the icon/title row above the preview (Exposé can hide it).</summary>
+    public static readonly DependencyProperty ShowTitleProperty = DependencyProperty.Register(
+        nameof(ShowTitle), typeof(bool), typeof(PreviewCard), new PropertyMetadata(true, (d, _) => ((PreviewCard)d).ApplyTitleVisibility()));
+
+    public bool ShowTitle
+    {
+        get => (bool)GetValue(ShowTitleProperty);
+        set => SetValue(ShowTitleProperty, value);
+    }
+
+    private void ApplyTitleVisibility()
+    {
+        TitleRow.Height = new GridLength(ShowTitle ? 20 : 0);
+        GapRow.Height = new GridLength(ShowTitle ? 4 : 0);
+        TitleBar.Visibility = ShowTitle ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     public PreviewCard()
     {
         InitializeComponent();

@@ -41,29 +41,71 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <!-- Type-to-filter: shown only while there is filter text. -->
-                <Border x:Name="FilterBar" Grid.Row="0" Height="36" Margin="8,8,8,0" CornerRadius="8"
-                        Background="#33FFFFFF" Visibility="Collapsed">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
-                        <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="12"
-                                   Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="FilterText" FontSize="13" Foreground="{StaticResource PrimaryTextBrush}"
-                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="200" />
-                    </StackPanel>
-                </Border>
+                <!-- Header: type-to-search box and the Exposé button. -->
+                <Grid x:Name="HeaderBar" Grid.Row="0" Height="36" Margin="8,8,8,0">
+                    <Border x:Name="SearchBox" CornerRadius="8" Background="{StaticResource FilterBarBrush}" Margin="0,0,42,0"
+                            Cursor="IBeam" MouseLeftButtonUp="OnSearchBoxClicked" ToolTip="Type to search window titles and apps">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
+                            <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="12"
+                                       Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="FilterText" FontSize="13" Foreground="{StaticResource PrimaryTextBrush}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="170" />
+                            <TextBlock x:Name="SearchPlaceholder" Text="Type to search" FontSize="13"
+                                       Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <Button x:Name="ExposeButton" HorizontalAlignment="Right" Width="36" Height="36"
+                            Style="{StaticResource IconButton}" Click="OnExposeClicked"
+                            ToolTip="Show all windows (Exposé)" AutomationProperties.Name="Show all windows">
+                        <TextBlock Text="&#xE8A9;" FontFamily="{StaticResource IconFont}" FontSize="14" />
+                    </Button>
+                </Grid>
 
                 <ScrollViewer x:Name="Scroller" Grid.Row="1" Style="{StaticResource SlimScrollViewer}"
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               CanContentScroll="False" Focusable="False">
-                    <ItemsControl x:Name="CardList" ItemsSource="{Binding Cards}" Focusable="False"
-                                  Margin="{x:Static ui:SidebarWindow.ListMargin}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <ui:PreviewCard Margin="0,0,0,6"
-                                                MouseEnter="OnCardMouseEnter"
+                    <ItemsControl x:Name="CardList" ItemsSource="{Binding Items}" Focusable="False">
+                        <ItemsControl.Resources>
+                            <DataTemplate DataType="{x:Type ui:CardViewModel}">
+                                <ui:PreviewCard Height="{DynamicResource SidebarCardHeight}" Margin="{DynamicResource CardSpacingMargin}"
+                                                MouseEnter="OnCardMouseEnter" MouseMove="OnCardMouseEnter"
                                                 MouseLeftButtonUp="OnCardClicked" />
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type ui:GroupHeaderViewModel}">
+                                <Border Height="26" Margin="{DynamicResource CardSpacingMargin}" CornerRadius="6" Padding="8,0"
+                                        Background="{StaticResource GroupHeaderBrush}" Cursor="Hand"
+                                        MouseLeftButtonUp="OnGroupHeaderClicked" ToolTip="Click to collapse or expand">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Image Width="14" Height="14" Margin="0,0,7,0" VerticalAlignment="Center"
+                                               Source="{Binding Icon, TargetNullValue={StaticResource GenericAppIcon}}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding AppName}" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource PrimaryTextBrush}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Summary}" FontSize="11" Margin="8,0"
+                                                   Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" FontFamily="{StaticResource IconFont}" FontSize="10" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource SecondaryTextBrush}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="&#xE70D;" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsCollapsed}" Value="True">
+                                                            <Setter Property="Text" Value="&#xE76C;" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.Resources>
                     </ItemsControl>
                 </ScrollViewer>
 

@@ -36,6 +36,18 @@ internal sealed class ThumbnailLayoutCoordinator
     /// <summary>0–255 multiplier applied to every thumbnail (used by fade animations).</summary>
     public byte Opacity { get; set; } = 255;
 
+    /// <summary>Optional per-card opacity (0–1), multiplied with <see cref="Opacity"/>.</summary>
+    public Func<CardViewModel, double>? CardOpacity { get; set; }
+
+    /// <summary>
+    /// Clip previews to the scroll viewport (normal). Exposé turns this off while previews fly in
+    /// from the windows' real positions, which can lie outside the scroll area.
+    /// </summary>
+    public bool ClipToViewport { get; set; } = true;
+
+    /// <summary>Round the previews' corners with the mask window (off while previews are moving).</summary>
+    public bool MaskEnabled { get; set; } = true;
+
     public int Count => _registrations.Count;
 
     /// <summary>Registers thumbnails for new cards and releases those of removed cards.</summary>
@@ -48,7 +60,9 @@ internal sealed class ThumbnailLayoutCoordinator
             _registrations.Remove(card);
         }
 
-        foreach (CardViewModel card in cards)
+        // DWM draws later registrations on top: register back to front so the first (most recently
+        // used) card is topmost, like the real windows' stacking order.
+        foreach (CardViewModel card in cards.Reverse())
         {
             if (_registrations.ContainsKey(card) || card.PreviewUnavailable)
                 continue;
@@ -70,8 +84,10 @@ internal sealed class ThumbnailLayoutCoordinator
             return;
 
         double scale = VisualTreeHelper.GetDpi(_window).DpiScaleX;
-        PixelRect viewport = ToDevice(_scroll, new Rect(0, 0, _scroll.ViewportWidth, _scroll.ViewportHeight), scale)
-            .Intersect(new PixelRect(0, 0, _window.ActualWidth, _window.ActualHeight).Scale(scale));
+        PixelRect windowRect = new PixelRect(0, 0, _window.ActualWidth, _window.ActualHeight).Scale(scale);
+        PixelRect viewport = ClipToViewport
+            ? ToDevice(_scroll, new Rect(0, 0, _scroll.ViewportWidth, _scroll.ViewportHeight), scale).Intersect(windowRect)
+            : windowRect;
 
         List<CardViewModel>? lost = null;
         _maskItems.Clear();
@@ -83,9 +99,12 @@ internal sealed class ThumbnailLayoutCoordinator
                 PixelRect hostRect = ToDevice(host, new Rect(0, 0, host.ActualWidth, host.ActualHeight), scale);
                 placement = ThumbnailGeometry.Compute(hostRect, viewport, registration.SourceSize);
             }
-            if (!registration.Apply(placement, Opacity))
+            byte opacity = CardOpacity is null ? Opacity : (byte)Math.Round(Opacity * Math.Clamp(CardOpacity(card), 0, 1));
+            if (opacity == 0)
+                placement = ThumbnailPlacement.Hidden;
+            if (!registration.Apply(placement, opacity))
                 (lost ??= []).Add(card);
-            else if (placement.IsVisible)
+            else if (placement.IsVisible && MaskEnabled)
                 // A preview cut by the scroll viewport keeps square corners on the cut edge.
                 _maskItems.Add(new CornerMaskWindow.Item(placement.Destination,
                     RoundTop: placement.Source.Top <= 1,
@@ -98,6 +117,22 @@ internal sealed class ThumbnailLayoutCoordinator
             foreach (CardViewModel card in lost)
                 SourceLost?.Invoke(card);
     }
+
+    /// <summary>Re-registers a card's preview so it is drawn above all others (e.g. the chosen window while it flies back).</summary>
+    public void BringToFront(CardViewModel card, nint destination)
+    {
+        if (!_registrations.TryGetValue(card, out ThumbnailRegistration? old))
+            return;
+        ThumbnailRegistration? fresh = DwmThumbnailService.TryRegister(destination, card.Hwnd, out _);
+        if (fresh is null)
+            return;
+        _registrations[card] = fresh; // registered before the old one is released: no blank frame
+        old.Dispose();
+    }
+
+    /// <summary>Source window size of a card's live preview (empty when it has none).</summary>
+    public SIZE SourceSizeOf(CardViewModel card) =>
+        _registrations.TryGetValue(card, out ThumbnailRegistration? registration) ? registration.SourceSize : default;
 
     /// <summary>Re-reads source sizes (windows can be resized or restored while the sidebar is open).</summary>
     public bool RefreshSourceSizes()
