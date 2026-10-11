@@ -163,7 +163,12 @@
 
         <Border Style="{StaticResource Row}">
             <StackPanel>
-                <TextBlock Text="Windows of these apps never appear in the sidebar." />
+                <Grid>
+                    <TextBlock Text="Windows of these apps never appear in the sidebar or Exposé." TextWrapping="Wrap" Margin="0,0,84,0" />
+                    <Button x:Name="ShowAllApps" Content="Show all" Style="{StaticResource DarkButton}" Padding="10,3"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Click="OnShowAllApps"
+                            ToolTip="Remove every app from this list" />
+                </Grid>
                 <TextBlock x:Name="HiddenAppsHint" Style="{StaticResource Hint}"
                            Text="Right-click a card and choose “Never show …”, or type a program name such as spotify." />
                 <Grid Margin="0,10,0,0">

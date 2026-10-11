@@ -28,6 +28,23 @@ public partial class PreviewCard : UserControl
         set => SetValue(ShowTitleProperty, value);
     }
 
+    /// <summary>Show the app icon in the title row.</summary>
+    public static readonly DependencyProperty ShowIconProperty = DependencyProperty.Register(
+        nameof(ShowIcon), typeof(bool), typeof(PreviewCard), new PropertyMetadata(true, (d, _) => ((PreviewCard)d).ApplyIconVisibility()));
+
+    public bool ShowIcon
+    {
+        get => (bool)GetValue(ShowIconProperty);
+        set => SetValue(ShowIconProperty, value);
+    }
+
+    private void ApplyIconVisibility()
+    {
+        IconColumn.Width = new GridLength(ShowIcon ? 16 : 0);
+        IconGapColumn.Width = new GridLength(ShowIcon ? 6 : 0);
+        TitleIcon.Visibility = ShowIcon ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void ApplyTitleVisibility()
     {
         TitleRow.Height = new GridLength(ShowTitle ? 20 : 0);

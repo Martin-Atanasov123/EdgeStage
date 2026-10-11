@@ -18,7 +18,12 @@ public readonly record struct Hotkey(HotkeyModifiers Modifiers, int VirtualKey)
 {
     public const int VK_SPACE = 0x20;
 
+    public const int VK_UP = 0x26;
+
     public static Hotkey Default => new(HotkeyModifiers.Control | HotkeyModifiers.Alt, VK_SPACE);
+
+    /// <summary>Exposé: Ctrl+Alt+Up (no Ctrl+Alt+letter: on many keyboard layouts that is AltGr+letter, used for typing).</summary>
+    public static Hotkey ExposeDefault => new(HotkeyModifiers.Control | HotkeyModifiers.Alt, VK_UP);
 
     private static readonly Dictionary<int, string> Names = BuildNames();
     private static readonly Dictionary<string, int> Codes = BuildCodes();

@@ -25,10 +25,16 @@ public sealed record ExposeOptions(
     CardSize CardSize = CardSize.Standard,
     bool Grouping = false,
     bool ShowTitles = true,
+    bool ShowIcons = true,
+    bool Search = true,
     bool Animations = true,
     double AnimationScale = 1.0)
 {
     public static ExposeOptions Default { get; } = new();
+
+    public static ExposeOptions From(AppSettings s) => new(
+        s.ExposeAllMonitors, s.ExposeDensity, s.CardSize, s.ExposeGrouping, s.ExposeShowTitles,
+        s.ExposeShowIcons, s.ExposeSearch, s.UseMotion, s.AnimationSpeed);
 }
 
 /// <summary>
@@ -104,6 +110,11 @@ public partial class ExposeWindow : Window
                 _thumbs.Update();
         };
         _vm.Cards.CollectionChanged += OnCardsChanged;
+        _vm.Items.CollectionChanged += (_, _) =>
+        {
+            if (IsOpen)
+                ApplyGrid(); // group headers change the grid even when the cards do not
+        };
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(WindowListViewModel.Filter))
@@ -150,6 +161,7 @@ public partial class ExposeWindow : Window
         Resources["ThumbCornerRadius"] = new CornerRadius(metrics.ThumbCornerRadius);
         Resources["CardPaddingThickness"] = new Thickness(metrics.CardPadding);
         Resources["ExposeShowTitles"] = _options.ShowTitles;
+        Resources["ExposeShowIcons"] = _options.ShowIcons;
         _mask.Radius = metrics.ThumbCornerRadius > 0 ? metrics.ThumbCornerRadius + 1 : 0;
     }
 
@@ -165,7 +177,8 @@ public partial class ExposeWindow : Window
         _monitor = monitor;
         _settings = settings;
         _options = options;
-        Resources["ExposeShowTitles"] = options.ShowTitles;
+        ApplyMetrics(settings.CardMetrics);
+        SearchBox.Visibility = options.Search ? Visibility.Visible : Visibility.Hidden;
 
         // Remember where to return on Esc, before EdgeStage itself takes the foreground.
         _previous = User32.GetForegroundWindow();
@@ -541,10 +554,7 @@ public partial class ExposeWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
-                if (_vm.HasFilter)
-                    _vm.Filter = "";   // first Esc clears the search, the next one closes
-                else
-                    Dismiss("escape");
+                HandleEscape();
                 break;
             case Key.Back when _vm.HasFilter:
                 _vm.Filter = _vm.Filter[..^1];
@@ -585,10 +595,19 @@ public partial class ExposeWindow : Window
         e.Handled = true;
     }
 
+    /// <summary>The first Esc clears the search, the next one closes and returns to the previous window.</summary>
+    private void HandleEscape()
+    {
+        if (_vm.HasFilter)
+            _vm.Filter = "";
+        else
+            Dismiss("escape");
+    }
+
     private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
     {
         string text = e.Text;
-        if (!IsOpen || string.IsNullOrEmpty(text) || text.Any(char.IsControl) || _vm.Filter.Length >= 60)
+        if (!IsOpen || !_options.Search || string.IsNullOrEmpty(text) || text.Any(char.IsControl) || _vm.Filter.Length >= 60)
             return;
         if (text == " " && !_vm.HasFilter)
             return;
@@ -675,8 +694,18 @@ public partial class ExposeWindow : Window
         }
     }
 
+    internal void TypeForTest(string text)
+    {
+        if (IsOpen && _options.Search)
+            _vm.Filter += text;
+    }
+
+    internal void EscapeKeyForTest() => HandleEscape();
+
+    internal void ToggleGroupingForTest() => _vm.Grouping = !_vm.Grouping;
+
     internal string DescribeForTest() =>
-        $"open={IsOpen} cards={_vm.Cards.Count} thumbs={_thumbs.Count} selected={_vm.SelectedIndex} " +
+        $"open={IsOpen} cards={_vm.Cards.Count} groups={_vm.GroupCount} filter='{_vm.Filter}' thumbs={_thumbs.Count} selected={_vm.SelectedIndex} " +
         $"boxes=[{string.Join("; ", Grid?.CardBoxes().Select(b => $"{b.X:F0},{b.Y:F0} {b.Width:F0}x{b.Height:F0}") ?? [])}]";
 #endif
 

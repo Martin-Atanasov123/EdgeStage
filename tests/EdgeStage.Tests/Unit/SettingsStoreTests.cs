@@ -72,7 +72,7 @@ public sealed class SettingsStoreTests
 
         StringAssert.Contains(json, "\"hotkey\": \"Ctrl+Alt+Space\"");
         StringAssert.Contains(json, "\"edge\": \"Left\"");
-        StringAssert.Contains(json, "\"schemaVersion\": 1");
+        StringAssert.Contains(json, "\"schemaVersion\": 2");
     }
 
     [TestMethod]
@@ -89,7 +89,7 @@ public sealed class SettingsStoreTests
     [TestMethod]
     public void OneBadValue_ResetsOnlyThatValue()
     {
-        File.WriteAllText(FilePath, """{ "edge": "Top", "hotkey": "Ctrl+Nope", "activationDelayMs": 500 }""");
+        File.WriteAllText(FilePath, """{ "schemaVersion": 2, "edge": "Top", "hotkey": "Ctrl+Nope", "activationDelayMs": 500 }""");
 
         var (settings, outcome) = new SettingsStore(FilePath).Load();
 
@@ -136,7 +136,8 @@ public sealed class SettingsStoreTests
         File.WriteAllText(FilePath, """
             {
               // user note
-              "edge": "Right",
+              "schemaVersion": 2,
+              "sidebar": { "edge": "Right", },
             }
             """);
 

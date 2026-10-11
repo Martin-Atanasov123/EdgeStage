@@ -41,6 +41,9 @@ internal static class SingleInstance
         ExposeDown,
         ExposeDescribe,
         SidebarExposeButton,
+        ExposeTypeSearch,
+        ExposeEscapeKey,
+        ExposeToggleGrouping,
     }
 #endif
 

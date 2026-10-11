@@ -51,6 +51,8 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         _startup = startup;
         (Settings, SettingsLoadOutcome outcome) = _store.Load();
         Log.Info($"Settings {outcome} ({store.FilePath}): {Settings}");
+        if (outcome == SettingsLoadOutcome.Migrated)
+            Log.Info($"Settings from EdgeStage 1.x were carried over (original kept as {store.V1BackupPath}).");
         if (outcome == SettingsLoadOutcome.RecoveredFromCorruption)
             LoadWarning = "Your settings file could not be read, so defaults are in use. A copy was saved next to it as settings.json.bak.";
 
@@ -109,7 +111,9 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         LogEnvironment();
         _tracker.Start();
         ApplyHotkey();
-        _edge.Configure(Settings.EdgeActivationEnabled, Settings.Edge, Settings.ActivationDelayMs);
+        _edge.Configure(Settings.EdgeActivationEnabled, Settings.Edge, Settings.ActivationDelayMs, Settings.EdgeInFullscreen);
+        _sidebar.ApplySettings(Settings);
+        _expose.ApplySettings(Settings);
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         SystemEvents.SessionSwitch += OnSessionSwitch;
         UpdateTrayTip();
@@ -167,7 +171,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         int index = monitorIndex ?? (User32.GetCursorPos(out POINT p) ? _layout.IndexOf(p) : 0);
         index = Math.Clamp(index, 0, _layout.Monitors.Count - 1);
         _edge.Pause();
-        ExposeOptions options = ExposeOptions.Default;
+        ExposeOptions options = ExposeOptions.From(Settings);
 #if DEBUG
         // Slow motion for animation captures in validation scripts.
         if (double.TryParse(Environment.GetEnvironmentVariable("EDGESTAGE_TEST_ANIMATION_SCALE"),
@@ -282,7 +286,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         Persist(settings);
         _sidebar.ApplySettings(Settings);
         _expose.ApplySettings(Settings);
-        _edge.Configure(settings.EdgeActivationEnabled, settings.Edge, settings.ActivationDelayMs);
+        _edge.Configure(settings.EdgeActivationEnabled, settings.Edge, settings.ActivationDelayMs, settings.EdgeInFullscreen);
         if (edgeChanged)
             _sidebar.Dismiss("edge changed", immediate: true);
         if (hotkeyChanged || !HotkeyStatus.Succeeded)
@@ -472,6 +476,9 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             case SingleInstance.TestCommand.ExposeUp: _expose.SelectForTest("up"); break;
             case SingleInstance.TestCommand.ExposeDown: _expose.SelectForTest("down"); break;
             case SingleInstance.TestCommand.ExposeDescribe: Log.Info("Exposé state: " + _expose.DescribeForTest()); break;
+            case SingleInstance.TestCommand.ExposeTypeSearch: _expose.TypeForTest("REPORT"); break;
+            case SingleInstance.TestCommand.ExposeEscapeKey: _expose.EscapeKeyForTest(); break;
+            case SingleInstance.TestCommand.ExposeToggleGrouping: _expose.ToggleGroupingForTest(); break;
             case SingleInstance.TestCommand.SidebarExposeButton:
                 ShowSidebar(SidebarOpenMode.Hotkey, PrimaryMonitorIndex);
                 _dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => _sidebar.ClickExposeButtonForTest());

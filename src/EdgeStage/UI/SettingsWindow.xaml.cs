@@ -95,6 +95,7 @@ internal partial class SettingsWindow : Window
     private void RefreshHiddenApps()
     {
         HiddenAppsList.Children.Clear();
+        ShowAllApps.IsEnabled = _host.Settings.ExcludedApps.Count > 0;
         foreach (string app in _host.Settings.ExcludedApps)
         {
             var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
@@ -133,6 +134,14 @@ internal partial class SettingsWindow : Window
             return;
         OnAddHiddenApp(sender, e);
         e.Handled = true;
+    }
+
+    private void OnShowAllApps(object sender, RoutedEventArgs e)
+    {
+        if (_host.Settings.ExcludedApps.Count == 0)
+            return;
+        Apply(_host.Settings with { ExcludedApps = AppNameList.Empty });
+        RefreshHiddenApps();
     }
 
     private void OnRemoveHiddenApp(object sender, RoutedEventArgs e)

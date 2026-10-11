@@ -60,7 +60,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.Resources>
                         <DataTemplate DataType="{x:Type ui:CardViewModel}">
-                            <ui:PreviewCard ShowTitle="{DynamicResource ExposeShowTitles}"
+                            <ui:PreviewCard ShowTitle="{DynamicResource ExposeShowTitles}" ShowIcon="{DynamicResource ExposeShowIcons}"
                                             MouseEnter="OnCardMouseEnter" MouseMove="OnCardMouseEnter"
                                             MouseLeftButtonUp="OnCardClicked" />
                         </DataTemplate>

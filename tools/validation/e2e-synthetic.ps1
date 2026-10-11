@@ -2,12 +2,21 @@
 # solution (dotnet build) because it uses DEBUG-only test hooks; never moves the mouse or types.
 param([string]$Config = "Debug")
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\guard.ps1"
+Assert-NoFullscreenApp
 $root  = (Resolve-Path "$PSScriptRoot\..\..").Path
 $spike = "$root\spike\ThumbnailSpike\bin\Debug\net10.0-windows\ThumbnailSpike.exe"
 $app   = "$root\src\EdgeStage\bin\$Config\net10.0-windows\EdgeStage.exe"
 $out   = Join-Path $root "artifacts\validation\e2e"
 New-Item -ItemType Directory -Force $out | Out-Null
 Remove-Item "$out\*" -ErrorAction SilentlyContinue
+
+# The user's own settings are restored afterwards (V2 rewrites a V1 file on load).
+$settings = Join-Path $env:APPDATA "EdgeStage\settings.json"
+$settingsBackup = Join-Path $out "settings.backup.json"
+if (Test-Path $settings) { Copy-Item $settings $settingsBackup -Force }
+$v1Backup = Join-Path $env:APPDATA "EdgeStage\settings.v1.json"
+$hadV1Backup = Test-Path $v1Backup
 
 Get-Process EdgeStage, ThumbnailSpike -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 500
@@ -52,17 +61,15 @@ $music = [E2E.W]::FindWindow([NullString]::Value, 'Music player')
 "Before activation: Music player minimized=$([E2E.W]::IsIconic($music))"
 Start-Process $app -ArgumentList '--test-activate-selected' -Wait
 Start-Sleep -Milliseconds 900
-$sb = New-Object System.Text.StringBuilder 256
-[void][E2E.W]::GetWindowText([E2E.W]::GetForegroundWindow(), $sb, 256)
+$sb = Get-SafeTitle ([E2E.W]::GetForegroundWindow())
 $sidebar = [E2E.W]::FindWindow([NullString]::Value, 'EdgeStage Sidebar')
 "After activation: foreground='$sb' musicMinimized=$([E2E.W]::IsIconic($music)) sidebarVisible=$([E2E.W]::IsWindowVisible($sidebar))"
 
 # Edge-mode open must not take focus: the foreground window stays the same.
 Start-Process $app -ArgumentList '--test-show-edge' -Wait
 Start-Sleep -Milliseconds 900
-$sb2 = New-Object System.Text.StringBuilder 256
-[void][E2E.W]::GetWindowText([E2E.W]::GetForegroundWindow(), $sb2, 256)
-"Edge-mode open: foreground='$sb2' (expected 'Music player') sidebarVisible=$([E2E.W]::IsWindowVisible($sidebar))"
+$sb2 = Get-SafeTitle ([E2E.W]::GetForegroundWindow())
+"Edge-mode open: foreground='$sb2' (expected: unchanged, the window active before) sidebarVisible=$([E2E.W]::IsWindowVisible($sidebar))"
 
 # Settings window and the shortcut-conflict notice (screenshots for review).
 Start-Process $app -ArgumentList '--test-open-settings' -Wait
@@ -85,6 +92,8 @@ $exited = $appProc.WaitForExit(5000)
 
 foreach ($p in $sources.Values) { if (-not $p.HasExited) { $p.Kill() } }
 if (-not $backdrop.HasExited) { $backdrop.Kill() }
+if (Test-Path $settingsBackup) { Copy-Item $settingsBackup $settings -Force; Remove-Item $settingsBackup }
+if (-not $hadV1Backup -and (Test-Path $v1Backup)) { Remove-Item $v1Backup }
 
 "--- capture notes ---"
 Get-ChildItem "$out\*.txt" | ForEach-Object { Get-Content $_ }

@@ -4,6 +4,8 @@
 # Requires a Debug build (DEBUG-only test commands). Never moves the mouse or types.
 param([string]$Config = "Debug")
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\guard.ps1"
+Assert-NoFullscreenApp
 $root  = (Resolve-Path "$PSScriptRoot\..\..").Path
 $spike = "$root\spike\ThumbnailSpike\bin\Debug\net10.0-windows\ThumbnailSpike.exe"
 $app   = "$root\src\EdgeStage\bin\$Config\net10.0-windows\EdgeStage.exe"
@@ -15,6 +17,8 @@ Remove-Item "$out\*" -ErrorAction SilentlyContinue
 $settings = Join-Path $env:APPDATA "EdgeStage\settings.json"
 $settingsBackup = Join-Path $out "settings.backup.json"
 if (Test-Path $settings) { Copy-Item $settings $settingsBackup -Force }
+$v1Backup = Join-Path $env:APPDATA "EdgeStage\settings.v1.json"
+$hadV1Backup = Test-Path $v1Backup
 
 Get-Process EdgeStage, ThumbnailSpike -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 500
@@ -25,7 +29,7 @@ $logStart = if (Test-Path $log) { (Get-Content $log).Count } else { 0 }
 Add-Type -Namespace E2X -Name W -MemberDefinition '[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow(); [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(System.IntPtr h, System.Text.StringBuilder s, int n); [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern System.IntPtr FindWindow(string c, string t); [DllImport("user32.dll")] public static extern bool IsWindowVisible(System.IntPtr h); [DllImport("user32.dll")] public static extern bool IsIconic(System.IntPtr h);' -ErrorAction SilentlyContinue
 # Window title; this file stays ASCII because Windows PowerShell reads it as ANSI.
 $ExposeTitle = 'EdgeStage Expos' + [char]0xE9
-function Title($h) { $sb = New-Object System.Text.StringBuilder 256; [void][E2X.W]::GetWindowText($h, $sb, 256); "$sb" }
+function Title($h) { Get-SafeTitle $h }
 function Cmd($name) { Start-Process $app -ArgumentList '--test-cmd', $name -Wait }
 function Shot($name, $frames = 1, $interval = 250) {
     # Work area of the primary monitor only (the taskbar row is never captured).
@@ -80,6 +84,24 @@ Start-Sleep -Milliseconds 1200
 Shot 'removed'
 Cmd 'ExposeDescribe'
 
+# 3b. Search (case-insensitive, title + app name), then Esc clears the search before closing anything.
+Cmd 'ExposeTypeSearch'
+Start-Sleep -Milliseconds 600
+Shot 'search'
+Cmd 'ExposeDescribe'
+Cmd 'ExposeEscapeKey'
+Start-Sleep -Milliseconds 600
+Cmd 'ExposeDescribe'
+"After first Esc: Expose visible=$([E2X.W]::IsWindowVisible($expose)) (expected True: Esc only cleared the search)"
+
+# 3c. Group by app.
+Cmd 'ExposeToggleGrouping'
+Start-Sleep -Milliseconds 700
+Shot 'grouped'
+Cmd 'ExposeDescribe'
+Cmd 'ExposeToggleGrouping'
+Start-Sleep -Milliseconds 500
+
 # 4. Esc: previews fly back and the overlay closes (the return to the previous window is checked in 5b,
 #    where that window is a known test window).
 Start-Process $app -ArgumentList '--test-cmd', 'ExposeEscape'
@@ -128,6 +150,7 @@ $exited = $appProc.WaitForExit(5000)
 foreach ($p in $sources.Values) { if (-not $p.HasExited) { $p.Kill() } }
 if (-not $backdrop.HasExited) { $backdrop.Kill() }
 if (Test-Path $settingsBackup) { Copy-Item $settingsBackup $settings -Force; Remove-Item $settingsBackup }
+if (-not $hadV1Backup -and (Test-Path $v1Backup)) { Remove-Item $v1Backup }
 
 "--- capture notes ---"
 Get-ChildItem "$out\*.txt" | ForEach-Object { Get-Content $_ }

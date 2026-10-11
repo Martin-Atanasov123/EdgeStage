@@ -7,6 +7,8 @@
     <CornerRadius x:Key="ThumbCornerRadius">5</CornerRadius>
     <Thickness x:Key="CardPaddingThickness">5</Thickness>
     <sys:Double x:Key="SidebarCardHeight">183</sys:Double>
+    <sys:Boolean x:Key="ExposeShowTitles">True</sys:Boolean>
+    <sys:Boolean x:Key="ExposeShowIcons">True</sys:Boolean>
     <Thickness x:Key="CardSpacingMargin">0,0,0,6</Thickness>
 
     <!-- Palette: dark charcoal surfaces, restrained translucency, one accent. -->

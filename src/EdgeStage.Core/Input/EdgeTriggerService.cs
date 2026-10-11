@@ -29,6 +29,7 @@ public sealed class EdgeTriggerService : IDisposable
     private MonitorLayout _layout;
     private ScreenEdge _edge = ScreenEdge.Left;
     private bool _enabled;
+    private bool _allowInFullscreen;
     private bool _paused;
     private bool _disposed;
     private long _ticks;
@@ -48,11 +49,13 @@ public sealed class EdgeTriggerService : IDisposable
 
     public bool IsPolling { get; private set; }
 
-    public void Configure(bool enabled, ScreenEdge edge, int delayMs)
+    /// <param name="allowInFullscreen">Also trigger while a full-screen app is in front of that monitor (off by default: games and videos are never interrupted).</param>
+    public void Configure(bool enabled, ScreenEdge edge, int delayMs, bool allowInFullscreen = false)
     {
         lock (_gate)
         {
             _enabled = enabled;
+            _allowInFullscreen = allowInFullscreen;
             _edge = edge;
             _machine.DelayMs = delayMs;
             _machine.Reset();
@@ -122,7 +125,7 @@ public sealed class EdgeTriggerService : IDisposable
 
                 int? zone = layout.ZoneAt(p, _edge);
                 fire = _machine.Update(Environment.TickCount64, zone, AnyButtonDown(),
-                    monitor => FullscreenDetector.IsFullscreenOn(layout.Monitors[monitor]));
+                    monitor => !_allowInFullscreen && FullscreenDetector.IsFullscreenOn(layout.Monitors[monitor]));
                 next = zone is not null || layout.DistanceToEdge(p, _edge) <= NearDistancePx ? NearIntervalMs : FarIntervalMs;
             }
 

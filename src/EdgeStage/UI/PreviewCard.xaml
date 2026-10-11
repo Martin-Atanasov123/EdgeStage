@@ -62,14 +62,14 @@
 
             <Grid x:Name="TitleBar" Grid.Row="0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition x:Name="IconColumn" Width="16" />
+                    <ColumnDefinition x:Name="IconGapColumn" Width="6" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Image Grid.Column="0" Width="16" Height="16" VerticalAlignment="Center"
+                <Image x:Name="TitleIcon" Grid.Column="0" Width="16" Height="16" VerticalAlignment="Center"
                        RenderOptions.BitmapScalingMode="HighQuality"
                        Source="{Binding Icon, TargetNullValue={StaticResource GenericAppIcon}}" />
 

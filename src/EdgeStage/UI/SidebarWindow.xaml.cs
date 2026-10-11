@@ -180,7 +180,7 @@ public partial class SidebarWindow : Window
         _monitor = monitor;
         _edge = settings.Edge;
         _dismissDelayMs = settings.DismissDelayMs;
-        _settings = settings;
+        ApplySettings(settings);
         _vm.Filter = "";
         ShowFilterText();
 
@@ -521,7 +521,7 @@ public partial class SidebarWindow : Window
     private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
     {
         string text = e.Text;
-        if (!IsOpen || string.IsNullOrEmpty(text) || text.Any(char.IsControl) || _vm.Filter.Length >= 40)
+        if (!IsOpen || !_settings.SidebarSearch || string.IsNullOrEmpty(text) || text.Any(char.IsControl) || _vm.Filter.Length >= 40)
             return;
         if (text == " " && !_vm.HasFilter)
             return;
@@ -540,13 +540,20 @@ public partial class SidebarWindow : Window
         return true;
     }
 
-    /// <summary>Applies changed settings to an open sidebar (e.g. an app was just hidden).</summary>
+    /// <summary>Applies changed settings (appearance, search, grouping; an app just hidden disappears at once).</summary>
     public void ApplySettings(AppSettings settings)
     {
         _settings = settings;
+        if (_vm.Metrics != settings.CardMetrics)
+            ApplyMetrics(settings.CardMetrics);
+        _vm.ShowSearchBar = true; // the header also holds the Exposé button
+        SearchBox.Visibility = settings.SidebarSearch ? Visibility.Visible : Visibility.Hidden;
+        _vm.Grouping = settings.SidebarGrouping;
+        if (!settings.SidebarSearch && _vm.HasFilter)
+            _vm.Filter = "";
         if (!IsOpen)
             return;
-        foreach (CardViewModel card in _vm.Cards.Where(c => settings.IsExcluded(c.ProcessName)).ToList())
+        foreach (CardViewModel card in _vm.AllCards.Where(c => settings.IsExcluded(c.ProcessName)).ToList())
             RemoveCard(card, "app hidden");
     }
 
