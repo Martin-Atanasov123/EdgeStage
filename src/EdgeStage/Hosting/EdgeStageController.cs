@@ -498,6 +498,11 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             ShowSidebar(SidebarOpenMode.Hotkey);
             return true;
         }
+        if (message == SingleInstance.ToggleExposeMessage)
+        {
+            ToggleExpose();
+            return true;
+        }
         if (message == SingleInstance.ExitMessage)
         {
             ExitRequested?.Invoke();

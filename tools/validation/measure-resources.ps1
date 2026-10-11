@@ -7,6 +7,14 @@ param(
     [string]$Label = "build"
 )
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\guard.ps1"
+Assert-NoFullscreenApp
+# The user's own settings are restored afterwards (V2 rewrites a V1 file on load).
+$settings = Join-Path $env:APPDATA "EdgeStage\settings.json"
+$settingsBackup = Join-Path $env:TEMP "edgestage-settings.backup.json"
+if (Test-Path $settings) { Copy-Item $settings $settingsBackup -Force }
+$v1Backup = Join-Path $env:APPDATA "EdgeStage\settings.v1.json"
+$hadV1Backup = Test-Path $v1Backup
 Add-Type -Namespace Meas -Name N -MemberDefinition @'
 [DllImport("kernel32.dll")] public static extern System.IntPtr OpenProcess(uint access, bool inherit, uint pid);
 [DllImport("kernel32.dll")] public static extern bool CloseHandle(System.IntPtr h);
@@ -33,7 +41,7 @@ function Snapshot($p) {
 
 Get-Process EdgeStage -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 500
-$p = Start-Process $Exe -PassThru
+$p = Start-Process $Exe -ArgumentList '--autostart' -PassThru
 Start-Sleep -Seconds 4
 # Close the startup shortcut-conflict notice (this machine already uses Ctrl+Alt+Space), so the
 # measurement reflects normal idle: nothing on screen.
@@ -61,4 +69,30 @@ $el2 = ((Get-Date) - $t1).TotalSeconds; $cpu2 = $o1.CpuSeconds - $o0.CpuSeconds
 "[$Label] sidebar OPEN and idle for $([math]::Round($el2,1)) s"
 "  CPU time used: $([math]::Round($cpu2*1000,1)) ms  =>  $([math]::Round(100*$cpu2/$el2,3)) % of one core"
 "  open:  $($o1 | ConvertTo-Json -Compress)"
-$p
+
+# Expose open and idle (no pointer movement): 15 s. --expose toggles Expose in the running instance.
+Start-Process $Exe -ArgumentList '--expose' -Wait
+Start-Sleep -Seconds 2
+$e0 = Snapshot $p; $t2 = Get-Date
+Start-Sleep -Seconds 15
+$e1 = Snapshot $p
+$el3 = ((Get-Date) - $t2).TotalSeconds; $cpu3 = $e1.CpuSeconds - $e0.CpuSeconds
+"[$Label] Expose OPEN and idle for $([math]::Round($el3,1)) s"
+"  CPU time used: $([math]::Round($cpu3*1000,1)) ms  =>  $([math]::Round(100*$cpu3/$el3,3)) % of one core"
+"  open:  $($e1 | ConvertTo-Json -Compress)"
+
+# Closed again: idle cost must return to the hidden baseline.
+Start-Process $Exe -ArgumentList '--expose' -Wait
+Start-Sleep -Seconds 3
+$h0 = Snapshot $p; $t3 = Get-Date
+Start-Sleep -Seconds 20
+$h1 = Snapshot $p
+$el4 = ((Get-Date) - $t3).TotalSeconds; $cpu4 = $h1.CpuSeconds - $h0.CpuSeconds
+"[$Label] hidden again after Expose, idle for $([math]::Round($el4,1)) s"
+"  CPU time used: $([math]::Round($cpu4*1000,1)) ms  =>  $([math]::Round(100*$cpu4/$el4,3)) % of one core"
+"  end:   $($h1 | ConvertTo-Json -Compress)"
+
+Start-Process $Exe -ArgumentList '--exit' -Wait
+"exited: $($p.WaitForExit(5000))"
+if (Test-Path $settingsBackup) { Copy-Item $settingsBackup $settings -Force; Remove-Item $settingsBackup }
+if (-not $hadV1Backup -and (Test-Path $v1Backup)) { Remove-Item $v1Backup }

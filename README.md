@@ -4,7 +4,7 @@
 
 ### Switch windows from **live previews** at the edge of your screen ✨
 
-*A Stage Manager-style window switcher for Windows 10/11*
+*A Stage Manager-style window switcher with an Exposé view, for Windows 10/11*
 
 [![CI](https://github.com/Martin-Atanasov123/EdgeStage/actions/workflows/ci.yml/badge.svg)](https://github.com/Martin-Atanasov123/EdgeStage/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/Martin-Atanasov123/EdgeStage?label=release&color=60CDFF)](https://github.com/Martin-Atanasov123/EdgeStage/releases/latest)
@@ -18,6 +18,8 @@
 &nbsp;&nbsp;
 <img src="docs/images/tray-menu.png" alt="EdgeStage tray menu" height="270">
 
+<img src="docs/images/expose.png" alt="Exposé: every window at once in a grid" width="720">
+
 <sub>Screenshots show synthetic test windows. The previews are live Windows thumbnails, not screenshots.</sub>
 
 </div>
@@ -30,6 +32,7 @@
 2. ▶️ Run **`EdgeStage.exe`**. It lives quietly in your tray (check the `^` overflow arrow).
 3. 🖱️ Move the mouse to the **left screen edge** and rest it for a moment, or press **Ctrl+Alt+Space**.
 4. 👆 Click a preview. It grows into that window. Done!
+5. 🪟 Press **Ctrl+Alt+Up** (or the grid button in the sidebar) for **Exposé**: every window at once.
 
 > 💡 **Shortcut taken?** If another app already uses Ctrl+Alt+Space, EdgeStage tells you and suggests a free one. The screen edge keeps working meanwhile.
 >
@@ -42,14 +45,16 @@
 | 🎥 | **Live previews** | Real Windows (DWM) thumbnails that keep updating: a video keeps playing, a terminal keeps scrolling. Only active while the sidebar is open. |
 | ⌨️ | **Open with a shortcut** | Default **Ctrl+Alt+Space** (changeable). ↑ ↓ ← → Tab Home End move, **Enter** switches, **Esc** closes. Your previous window is pre-selected, so *shortcut → Enter* flips back like Alt+Tab. |
 | 🖱️ | **Open from the screen edge** | Rest the pointer at the edge for 0.3 s. It opens **without stealing focus**, so you keep typing in your app. Ignored while you drag windows or when a full-screen app is running. |
-| 🔎 | **Type to filter** | Just start typing while the sidebar is open to filter by window title or app name. |
-| ❌ | **Close from the card** | A small × appears on hover; it closes the window like its own X button. Right-click for more. |
-| 🙈 | **Hidden apps** | Right-click → *Never show this app*, or manage the list in Settings. |
+| 🪟 | **Exposé** | **Ctrl+Alt+Up** shows every window at once in an adaptive grid on a dimmed screen. Previews fly out of the real windows and back; ← ↑ → ↓ move through the grid, **Enter** switches, **Esc** returns to where you were. Also from the sidebar's header, the tray, or `EdgeStage.exe --expose`. |
+| 🔎 | **Search** | Just start typing in the sidebar or Exposé: filters by window title and app name. Esc clears the search first. |
+| 🗂️ | **Group by app** *(optional)* | One collapsible group per app, in the sidebar and in Exposé. Every window stays selectable. |
+| ❌ | **Close from the card** | A small × appears on hover (or press **Ctrl+W**); it closes the window like its own X button, never kills the app. If the app is still open after 3 s (e.g. "Save changes?"), the card tells you. |
+| 🙈 | **Hidden apps** | Right-click → *Never show this app*, or manage the list in Settings. Applies to both views. |
 | 🎬 | **Zoom-to-window animation** | The preview grows from the card into the real window (about 0.2 s), like Stage Manager. Skipped when Windows animations are off. |
 | 🔁 | **Hold to switch** *(optional)* | Alt+Tab-style: hold the modifiers, tap the key to step through, release to switch. |
 | 🖥️ | **Multi-monitor and DPI aware** | Opens on the screen under your pointer. Optional *this monitor only* mode. |
-| 🎨 | **Looks at home** | Rounded charcoal panel, rounded previews, your Windows accent color, smooth slide and fade. |
-| 🧰 | **Tray and settings** | Edge on/off, left/right, delays, shortcut recorder, start with Windows. Changes apply instantly. |
+| 🎨 | **Make it yours** | Dark, Light or System theme · Windows accent, 9 curated colors or any `#RRGGBB` · Compact/Balanced/Spacious · card size, spacing, sidebar width, corner radius · animations on/off, duration, reduce motion. Everything applies live. |
+| 🧰 | **Tray and settings** | Open sidebar / Exposé, edge on/off, hidden apps, both shortcut recorders with conflict checks, start with Windows, reset to defaults. |
 | 🔒 | **Private and light** | No network, no telemetry, no admin rights. About 0.1 % of one CPU core while idle. |
 
 <details>
@@ -59,16 +64,17 @@
 |---|---|
 | Window list | Every switchable window on the current virtual desktop, on all monitors, most-recently-used first with the current window marked. Each window of an app gets its own card. Uses the same structural rules as Alt+Tab (never titles). EdgeStage, the desktop, the taskbar, tool windows, owned dialogs and cloaked windows are excluded. |
 | Switching | Restores minimized windows, activates the window (or its open dialog). Minimized windows zoom to where they will reappear. If Windows refuses the switch (for example an administrator window) a tray notification explains. |
-| Closing | Esc, choosing a window, clicking outside (shortcut mode), or moving the pointer away for 400 ms (configurable). The first Esc clears a filter, the second closes. |
+| Closing | Esc, choosing a window, clicking outside (shortcut mode), or moving the pointer away for 400 ms (configurable). The first Esc clears a search, the second closes. |
+| Exposé | Covers the monitor under the pointer and shows that monitor's windows (or all monitors' — a setting). Card size adapts to the number of windows (density: spacious, auto, denser); with very many windows the grid keeps a readable size and scrolls. Minimized windows and windows on other monitors fade in instead of flying. Pressing the sidebar shortcut switches to the sidebar. |
 | Overflow | Fixed-size cards; the list scrolls with a slim scrollbar and previews are clipped correctly while scrolling. |
 | Hold to switch | With the shortcut's modifiers held, press its key again to step (add Shift to go back); release to switch. A quick tap switches to the previous window. Needs a shortcut with a modifier. |
 | Robustness | Survives Explorer restarts (tray icon re-added), display changes and lock/unlock; single instance. |
 
 </details>
 
-> ✅ **Verification status:** everything above is implemented and covered by 201 automated tests plus scripted checks with synthetic windows. A few things could only be verified automatically, not by a person using a real keyboard and mouse: pressing the shortcut, physically resting the pointer at the edge, clicking cards, session lock, Explorer restarts, multiple monitors and other scaling levels. [docs/TESTING.md](docs/TESTING.md) lists exactly what was verified, how, and what still needs a manual check.
+> ✅ **Verification status:** everything above is implemented and covered by automated tests plus scripted checks with synthetic windows. Some things could only be verified automatically, not by a person using a real keyboard and mouse: pressing the shortcuts, physically resting the pointer at the edge, clicking cards, session lock, Explorer restarts, mixed-DPI monitors. [docs/TESTING.md](docs/TESTING.md) lists exactly what was verified, how, and what still needs a manual check.
 
-Not included: Exposé/Mission Control views, virtual-desktop management, window tiling or grouping, an always-visible strip. See the [roadmap](#-roadmap).
+Not included: virtual-desktop management (Mission Control spaces), window tiling, an always-visible strip. See the [roadmap](#-roadmap).
 
 ## 📦 Requirements
 
@@ -83,6 +89,7 @@ Not included: Exposé/Mission Control views, virtual-desktop management, window 
 |---|---|
 | *(none)* | Start; if already running, show the sidebar. |
 | `--show` | Start if needed and show the sidebar. |
+| `--expose` | Start if needed and open Exposé; if it is open, close it. Handy for mouse buttons or launcher shortcuts. |
 | `--exit` | Ask the running instance to quit. |
 | `--autostart` | Used by the "Start with Windows" entry: problems are reported quietly in the tray instead of a window. |
 
@@ -90,21 +97,47 @@ Not included: Exposé/Mission Control views, virtual-desktop management, window 
 
 | What | Where |
 |---|---|
-| ⚙️ Settings | `%APPDATA%\EdgeStage\settings.json`: human-readable JSON, comments allowed. A bad value resets only that value; an unreadable file is kept as `settings.json.bak` and defaults are used. |
+| ⚙️ Settings | `%APPDATA%\EdgeStage\settings.json`: human-readable JSON, comments allowed. A bad or mistyped value resets only that value; an unreadable file is kept as `settings.json.bak` and defaults are used. A file from EdgeStage 1.x is converted on first start; the original stays next to it as `settings.v1.json`. |
 | 📜 Logs | `%LOCALAPPDATA%\EdgeStage\logs\edgestage-YYYYMMDD.log` (5 most recent kept). Set `EDGESTAGE_LOG_LEVEL=Debug` for detailed traces. |
 | 🚪 Start with Windows | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `EdgeStage`. Off by default, toggled from the tray or settings. Respects the Task Manager "Startup apps" switch. |
 
 ```jsonc
 {
-  "schemaVersion": 1,
-  "edge": "Left",                 // Left | Right
-  "edgeActivationEnabled": true,
-  "activationDelayMs": 300,       // 0-2000
-  "dismissDelayMs": 400,          // 0-3000
-  "hotkey": "Ctrl+Alt+Space",     // e.g. "Alt+`", "Ctrl+Shift+Space", "Win+Alt+W"
-  "holdToSwitch": false,          // Alt+Tab-style hold and release
-  "onlyPointerMonitor": false,    // list only windows on the sidebar's monitor
-  "excludedApps": ["spotify"],    // process names that never appear
+  "schemaVersion": 2,
+  "sidebar": {
+    "hotkey": "Ctrl+Alt+Space",     // e.g. "Alt+`", "Ctrl+Shift+Space", "Win+Alt+W"
+    "holdToSwitch": false,          // Alt+Tab-style hold and release
+    "edge": "Left",                 // Left | Right
+    "edgeActivationEnabled": true,
+    "activationDelayMs": 300,       // 0-2000
+    "dismissDelayMs": 400,          // 0-3000
+    "edgeInFullscreen": false,      // let the edge work over full-screen apps
+    "onlyPointerMonitor": false,    // list only windows on the sidebar's monitor
+    "search": true,
+    "grouping": false               // false: most recently used; true: grouped by app
+  },
+  "expose": {
+    "hotkey": "Ctrl+Alt+Up",
+    "allMonitors": false,
+    "density": "Auto",              // Spacious | Auto | Dense
+    "grouping": false,
+    "showIcons": true,
+    "showTitles": true,
+    "search": true
+  },
+  "appearance": {
+    "theme": "Dark",                // Dark | Light | System
+    "accent": "System",             // System | Blue | Purple | Pink | Red | Orange | Yellow | Green | Teal | Graphite | "#RRGGBB"
+    "layout": "Balanced",           // Compact | Balanced | Spacious
+    "cardSize": "Standard",         // Small | Standard | Large (Exposé)
+    "cardSpacing": 6,               // 0-24
+    "sidebarWidth": 264,            // 220-400
+    "cornerRadius": 10,             // 0-20
+    "animations": true,
+    "animationPercent": 100,        // 50-200, larger is slower
+    "reducedMotion": false
+  },
+  "excludedApps": ["spotify"],      // process names that never appear
   "firstRunTipShown": true
 }
 ```
@@ -151,9 +184,9 @@ src/EdgeStage.Core/          no WPF; everything testable lives here
   Thumbnails/                DWM thumbnail registrations + placement/clipping math
   Activation/                restore + SetForegroundWindow, elevation diagnostics
   Input/                     hotkeys, monitor layout/edge zones, edge state machine, cursor polling, full-screen detection
-  Layout/                    sidebar placement and keep-open region
+  Layout/                    sidebar placement, card metrics, Exposé grid layout, arrow-key grid navigation
   Settings/, Diagnostics/    JSON settings, Start with Windows, local log
-src/EdgeStage/               WPF app: sidebar, cards, settings, tray, controller
+src/EdgeStage/               WPF app: sidebar, Exposé, cards, theme, settings, tray, controller
 tests/EdgeStage.Tests/       MSTest: unit tests + Desktop integration tests
 spike/ThumbnailSpike/        Phase 1 proof of concept and measurement tools
 tools/                       icon generator, validation scripts
@@ -166,6 +199,8 @@ Key decisions (evidence in [docs/spike-findings.md](docs/spike-findings.md)):
 - 🪞 **Layered (AllowsTransparency) sidebar window** instead of the Windows 11 Acrylic backdrop: Acrylic turns flat grey whenever the window is not active, and the edge-opened sidebar is never active.
 - 🐭 **Cursor polling instead of a low-level mouse hook** for the edge (100 ms far from the edge, 40 ms near it, stopped while the sidebar is open or edge activation is off). A WH_MOUSE_LL hook would put EdgeStage into the system-wide mouse input path, where any pause (for example garbage collection) stalls the cursor for every app; polling costs about 0.1 % of one core.
 - 📡 **WinEvent hooks** keep the most-recently-used order (foreground changes only, while hidden) and keep the open sidebar current (window create/destroy/show/hide/title/minimize/cloak, only while visible).
+- 🪟 **Exposé reuses the sidebar's machinery**: the same window list, filter and grouping model, the same thumbnail coordinator and corner masks. For the flight, each card gets a render transform that maps its preview exactly onto its window's screen rectangle; the DWM thumbnails follow the transform frame by frame, so at the start every preview covers its real window and the grid grows out of your desktop.
+- 🎨 **Themes swap brushes, not windows**: every color is looked up dynamically, so switching Dark/Light/accent recolors open windows at once.
 - 🧘 **No focus-lock workarounds.** EdgeStage activates windows only in response to your shortcut or click, when Windows grants foreground rights; refusals are reported, not circumvented.
 
 ## ⚠️ Known limitations
@@ -174,12 +209,12 @@ Key decisions (evidence in [docs/spike-findings.md](docs/spike-findings.md)):
 - 🧊 **Minimized windows** show the last frame Windows kept before minimizing (labelled "Minimized"); it is not live. If Windows has no frame, the app icon is shown instead.
 - ⬛ **Protected content** (DRM video, some secure apps) appears black, by design of Windows.
 - 🗂️ Windows on **other virtual desktops** are not listed (Windows hides them from previews).
-- 🔲 The preview that grows during the zoom animation has square corners until it becomes the real window.
+- 🔲 The preview that grows during the zoom animation, and previews while Exposé's cards fly, have square corners.
 
 **Window activation**
 - Windows controls who may take the foreground. Switching works in response to the shortcut, a click, or the tray; if Windows still refuses, you get a notification.
 - 🛡️ **Administrator (elevated) windows**: a non-elevated EdgeStage can list and usually preview them, but Windows may block restoring or activating them. EdgeStage does not elevate itself. Untested on the development machine.
-- 🎮 Exclusive full-screen games can prevent the sidebar from drawing on top.
+- 🎮 Exclusive full-screen games can prevent the sidebar or Exposé from drawing on top.
 
 **Input**
 - A global shortcut owned by another app is detected and reported; a conflict with a shortcut *inside* an app cannot be detected (the global shortcut wins).
@@ -189,7 +224,7 @@ Key decisions (evidence in [docs/spike-findings.md](docs/spike-findings.md)):
 - Windows 10, multiple monitors with mixed DPI, and display scaling other than 100 % are implemented but were **not tested on real hardware** (see [docs/TESTING.md](docs/TESTING.md)).
 - UWP/Store apps can show a generic icon when Windows exposes none.
 
-## 📊 Resource use (measured)
+## 📊 Resource use (measured with 1.1)
 
 Machine: Windows 11 Pro build 26300 (Insider), AMD Ryzen 5 5600X (6 cores/12 threads), 16 GB RAM, GeForce GTX 1650, one 1920×1080 60 Hz monitor at 100 %, Balanced power plan, .NET 10.0.8. Method: `tools\validation\measure-resources.ps1` (process CPU time, working set, private bytes, handles, GDI/USER objects).
 
@@ -203,11 +238,11 @@ Machine: Windows 11 Pro build 26300 (Insider), AMD Ryzen 5 5600X (6 cores/12 thr
 
 ## 🗺️ Roadmap
 
-Ideas that are not implemented: grouping windows of the same app, a full-screen overview mode, a per-app preview size, rounded corners on the zoom-to-window animation. Ideas and bug reports are welcome in [Issues](https://github.com/Martin-Atanasov123/EdgeStage/issues).
+Ideas that are not implemented: virtual-desktop views, a per-app preview size, rounded corners on the zoom-to-window and Exposé flight animations, a color picker beyond `#RRGGBB`. Ideas and bug reports are welcome in [Issues](https://github.com/Martin-Atanasov123/EdgeStage/issues).
 
 ## 🧪 Testing
 
-See [docs/TESTING.md](docs/TESTING.md) for the full report: 201 automated tests (169 unit, 32 desktop integration), scripted end-to-end checks with synthetic windows, and the list of checks that require manual testing.
+See [docs/TESTING.md](docs/TESTING.md) for the full report: automated unit and desktop integration tests, scripted end-to-end checks with synthetic windows (sidebar and Exposé), and the list of checks that require manual testing.
 
 ## 📄 License
 

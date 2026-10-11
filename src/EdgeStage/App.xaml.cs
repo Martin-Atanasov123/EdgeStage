@@ -57,7 +57,7 @@ public partial class App : Application
 
         if (!SingleInstance.TryAcquire())
         {
-            SingleInstance.Signal(SingleInstance.ShowSidebarMessage);
+            SingleInstance.Signal(HasArg("--expose") ? SingleInstance.ToggleExposeMessage : SingleInstance.ShowSidebarMessage);
             Shutdown(0);
             return;
         }
@@ -80,6 +80,8 @@ public partial class App : Application
 
         if (HasArg("--show"))
             _controller.ShowSidebar(SidebarOpenMode.Hotkey);
+        else if (HasArg("--expose"))
+            _controller.ShowExpose();
     }
 
     private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

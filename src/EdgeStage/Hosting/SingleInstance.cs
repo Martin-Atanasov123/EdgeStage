@@ -14,6 +14,9 @@ internal static class SingleInstance
     public static uint ShowSidebarMessage { get; } = User32.RegisterWindowMessage("EdgeStage.ShowSidebar.v1");
     public static uint ExitMessage { get; } = User32.RegisterWindowMessage("EdgeStage.Exit.v1");
 
+    /// <summary>Opens Exposé, or closes it when open (<c>EdgeStage.exe --expose</c>).</summary>
+    public static uint ToggleExposeMessage { get; } = User32.RegisterWindowMessage("EdgeStage.ToggleExpose.v1");
+
 #if DEBUG
     /// <summary>DEBUG only: activates the selected card, exercising the real activation path from scripts.</summary>
     public static uint TestActivateSelectedMessage { get; } = User32.RegisterWindowMessage("EdgeStage.Test.ActivateSelected.v1");

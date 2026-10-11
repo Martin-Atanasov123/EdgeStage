@@ -1,10 +1,72 @@
-# EdgeStage v1 — test report
+# EdgeStage — test report
 
 Status words: **PASS** = executed and met the expectation · **PARTIAL** = the logic was executed
 automatically but the real user-input path was not · **NOT RUN** = not executed (reason given).
-Nothing below is marked PASS unless it was actually run.
+Nothing below is marked PASS unless it was actually run. The 2.0 section comes first; the 1.x
+report follows unchanged as the baseline.
 
-## Environment
+## EdgeStage 2.0
+
+Environment as in 1.x below, except: a **second 1920×1080 monitor** (100 %) is now attached to the
+left of the primary one. Dates: 2026-10-11. Same rules: no synthesized input; screenshots only of
+EdgeStage over a full-screen opaque backdrop with synthetic windows (`EDGESTAGE_TEST_ONLY_PROCESS`);
+the scripts back up and restore the user's settings file and never print other windows' titles; they
+refuse to run while a full-screen app is in front (`tools/validation/guard.ps1`).
+
+### Automated tests
+
+| Run | Result |
+|---|---|
+| Unit tests (`--filter "TestCategory!=Desktop"`), Release, after Phase 4 | **219 passed**, 0 failed (includes 3 tray-menu tests that build the menu without showing it) |
+| Full suite incl. Desktop integration, Release, after Phase 2 | **242 passed**, 0 failed, 1 inconclusive (the same activation test as in 1.x) |
+| Full suite after Phases 3–4 | **NOT RUN yet** — a full-screen app was in front of the desktop from Phase 2 on, and the Desktop tests open windows and switch focus. Pending (see below). |
+
+New unit tests in 2.0: Exposé grid layout 14 (+data rows) · grid arrow navigation 5 · grouping 7 ·
+settings schema 2 / migration 10 (+data rows; one uses the **real 1.x settings file** of the
+development machine as a fixture) · themes 5 (incl. "every brush used by the views exists in both
+themes") · reset to defaults · tray menu Exposé/hidden-apps entries.
+
+### Scripted end-to-end checks (Debug build, synthetic windows) — `tools/validation/e2e-expose.ps1`
+
+| Check | Result |
+|---|---|
+| Exposé opens on the primary monitor with 5 windows, 5 live previews | **PASS** |
+| Fly-in: at the first frame every preview covers its real window exactly; previews fly into a centered grid; the minimized window fades in | **PASS** (frame captures) |
+| Animation smoothness (slowed ×3.3 for capture): 53–61 frames per 1000 ms open, 41–47 frames per 770–790 ms close | **PASS** (≈ 57–60 fps) |
+| Grid: 5 windows → 3 + 2 centered, 460 px cards; 6 windows → 3 × 2 | **PASS** |
+| Arrow navigation (Right, Down, Left, Up through the same code as the keys) | **PASS** |
+| A window opened / closed while Exposé is open appears / disappears | **PASS** |
+| Search "REPORT" → 1 of 5 matches (case-insensitive), counter shown; first Esc clears the search and Exposé stays open | **PASS** |
+| Group by app → header row, grid below it | **PASS** |
+| Select a card → the chosen preview flies back on top, that window becomes the foreground window (a minimized one is restored) | **PASS** |
+| Esc → previews fly back and the previously active window is active again | **PASS** |
+| Exposé button in the sidebar's header → sidebar closes, Exposé opens | **PASS** |
+| Clean exit, 0 DWM registrations left | **PASS** |
+| Sidebar regression (`e2e-synthetic.ps1`) with the new header: open, live add/remove, activation, edge mode keeps focus, clean exit | **PASS** after Phase 1; a re-run after Phase 2 was disturbed by a full-screen app starting mid-run (not counted) |
+| Real 1.x settings file migrated on start (log), restored afterwards by the script | **PASS** |
+| Exposé shortcut Ctrl+Alt+Up registered at start; tray entries; Ctrl+W close follow-up; light theme and new settings window rendering | **NOT RUN yet** (pending, needs the desktop) |
+| Leak cycles for sidebar and Exposé (`leak-cycles.ps1`), resource measurements of Exposé (`measure-resources.ps1`) | **NOT RUN yet** (pending, needs the desktop) |
+
+### Release builds
+
+`dotnet publish` with both profiles (to `artifacts/v2/...`): self-contained **125.0 MB**,
+framework-dependent **0.66 MB**. Build: 0 warnings, 0 errors.
+
+### Manual checklist additions for 2.0 (needs a person)
+
+16. Press **Ctrl+Alt+Up** → Exposé opens on the monitor under the pointer, previews fly out of the windows; arrows move; Enter switches; Esc goes back; pressing Ctrl+Alt+Up again closes.
+17. In Exposé: click the dimmed background → closes; scroll with the wheel when there are many windows; hover a card and click its ×.
+18. Type in Exposé and in the sidebar → search; Backspace edits; Esc clears, then closes.
+19. Settings › Appearance: switch Dark / Light / System, accents, a custom `#RRGGBB`, the layout presets and sliders → open sidebar and Exposé update live.
+20. Settings › Exposé: record a new shortcut; try one that equals the sidebar shortcut → refused with an explanation.
+21. Settings › General › Reset… → Cancel does nothing; Reset restores defaults and keeps hidden apps.
+22. Turn on *Reduce motion* → sidebar fades without sliding; no zoom; Exposé fades instead of flying. Turn *Animations* off → views appear at once.
+
+---
+
+## EdgeStage 1.x (baseline)
+
+### Environment
 
 | | |
 |---|---|
@@ -24,7 +86,7 @@ check that needs a real keyboard or mouse is marked PARTIAL or NOT RUN, and list
 (`EDGESTAGE_TEST_ONLY_PROCESS`) limited the sidebar to synthetic test windows. Checks against the
 user's real windows recorded aggregate pixel statistics only.
 
-## 1. Automated tests — 200 PASS, 1 inconclusive (201 total)
+### 1. Automated tests — 200 PASS, 1 inconclusive (201 total)
 
 ```bash
 dotnet test EdgeStage.slnx -c Release
@@ -37,7 +99,7 @@ Result (Debug and Release): **200 passed, 0 failed, 1 skipped/inconclusive** (th
 | Unit (169) | WindowFilter 16 · MruOrder 7 · Hotkey 6 (+data rows) · EdgeTriggerStateMachine 12 · MonitorLayout 10 · SidebarPlacement 8 · ThumbnailGeometry 10 · SettingsStore 10 · StartupRegistration 8 · SidebarViewModel 12 · Fullscreen/Log 7 · ICO + native struct layout 5 · smoke 1 | Alt+Tab filtering rules (never titles), MRU ordering and the "switch back" pre-selection, hotkey parsing/formatting, edge dwell/re-arm/button-held/full-screen rules, outer-edge zones with negative coordinates and monitor seams, placement and keep-open region at 100–200 % DPI, aspect-fit and scroll clipping, settings defaults/clamping/corruption/forward compatibility/atomic save, Start-with-Windows states incl. Task Manager "disabled", card list behaviour, icon sizes, NOTIFYICONDATAW = 976 bytes |
 | Desktop integration (32) | `TestCategory=Desktop` | Real windows created by the test process: enumeration excludes tool windows/owned dialogs/own process, minimized state; DWM register/apply/release, dead source detected, 300 registrations leave no live handles; hotkey conflict (Win32 error 1409) and release; **activation restores a minimized window and brings it to the foreground**; window gone; WinEvent show/title/destroy and stop-after-end; monitor layout; icon extraction; edge polling stops when disabled/paused; tray menu built for real and every item clicked (programmatically) against a fake host; settings window: load, toggles, debounced sliders, conflict suggestion, recorder suspends/resumes the global hotkey; Start with Windows against the real registry in a scratch key |
 
-## 2. Phase 1 spike — DWM thumbnails (PASS)
+### 2. Phase 1 spike — DWM thumbnails (PASS)
 
 Details and raw reports: [spike-findings.md](spike-findings.md).
 
@@ -49,7 +111,7 @@ Details and raw reports: [spike-findings.md](spike-findings.md).
 | Resource release | PASS — 0 handle/GDI/USER growth over 2,500+ registrations; release is safe after source or destination is destroyed |
 | Real windows (Notepad, Paint, UWP Calculator, minimized windows) | PASS — 6/6 drew content |
 
-## 3. Scripted end-to-end checks (real EdgeStage, synthetic windows)
+### 3. Scripted end-to-end checks (real EdgeStage, synthetic windows)
 
 Scripts: `tools\validation\e2e-synthetic.ps1`, `tools\validation\e2e-titles.ps1` (Debug build; they
 use DEBUG-only hooks to open the sidebar and to trigger "activate selected card" without input).
@@ -80,7 +142,7 @@ use DEBUG-only hooks to open the sidebar and to trigger "activate selected card"
 | Second launch shows the running instance's sidebar | PASS | log "Sidebar opened" after relaunch with `--show`; single process |
 | Published self-contained exe starts, shows, exits | PASS | smoke run of `artifacts\SelfContained\EdgeStage.exe` |
 
-## 4. Specification edge cases (§10)
+### 4. Specification edge cases (§10)
 
 | Case | Status | Notes |
 |---|---|---|
@@ -100,7 +162,7 @@ use DEBUG-only hooks to open the sidebar and to trigger "activate selected card"
 | Multiple monitors | NOT RUN on hardware | layout/seam/negative-coordinate logic unit-tested; one monitor attached |
 | Elevated (administrator) windows | NOT RUN | would need a UAC prompt; behaviour documented |
 
-## 5. Resource measurements
+### 5. Resource measurements
 
 Script: `tools\validation\measure-resources.ps1`; leak cycles: `tools\validation\leak-cycles.ps1`.
 
@@ -127,7 +189,7 @@ itself ~0.4 s later; real windows listed):
 254 opens / 254 dismissals, 0 errors logged, 0 DWM registrations at exit. Native resources are flat;
 managed memory plateaus after ~150 cycles (no leak).
 
-## 6. Bugs found and fixed during validation
+### 6. Bugs found and fixed during validation
 
 | Bug | Found by | Fix |
 |---|---|---|
@@ -139,7 +201,7 @@ managed memory plateaus after ~150 cycles (no leak).
 | Icon resources resolved against the wrong assembly in non-EdgeStage hosts | settings UI test | assembly-qualified pack URIs |
 | Single-file compression doubled idle memory | measurement | compression disabled for the self-contained build |
 
-## Manual checklist (needs a person)
+### Manual checklist (needs a person)
 
 These need real input and were **NOT RUN**. With EdgeStage running (and, on this machine, a free
 shortcut chosen first — Settings › Keyboard shortcut › *Use Alt+`*):
