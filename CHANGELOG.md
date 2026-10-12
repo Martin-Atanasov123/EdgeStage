@@ -2,7 +2,7 @@
 
 All notable changes to EdgeStage. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [2.0.0] - 2026-10-11
+## [2.0.0] - 2026-10-12
 
 ### Added
 - **Exposé**: every window at once in an adaptive grid on a dimmed full-screen overlay
@@ -10,6 +10,10 @@ All notable changes to EdgeStage. Versions follow [Semantic Versioning](https://
   `EdgeStage.exe --expose`). Previews fly out of the windows' real positions into the grid and back;
   the chosen window comes forward under the overlay. Arrow keys move spatially, Enter switches,
   Esc returns to the window you were using. Scrolls when there are too many windows.
+- **Choosing a window in Exposé** works like Mission Control: its preview flies onto the window's
+  exact visible bounds (normal, maximized, restored from minimized, on another monitor), the other
+  previews return to their windows, and the window comes forward as its preview lands. Esc returns
+  the same way. Windows without reliable bounds fade and scale instead.
 - **Exposé on every display**: with several monitors, Exposé appears on each of them at once, each
   showing the windows on that display, so any window can be picked wherever it is; ← → continue onto
   the neighboring display and search applies everywhere. Alternatives in Settings: only the display
@@ -37,24 +41,14 @@ All notable changes to EdgeStage. Versions follow [Semantic Versioning](https://
 - Hover selects a card only after the pointer moves, so a list appearing under a resting pointer no
   longer changes the keyboard selection.
 - The sidebar has a header with the search box and an Exposé button.
-- The validation scripts cover every monitor with backdrops, keep the user's EdgeStage and settings,
-  and refuse to run while a full-screen app is in front.
-
-- Choosing a window in Exposé: its preview flies onto the window's exact visible bounds (normal,
-  maximized, restored from minimized, other monitor), the other previews return to their windows, and
-  the window is activated as its preview lands, in the same step as the overlay disappears. Esc
-  returns the same way. 280 ms ease-in-out; windows without reliable bounds fade and scale instead.
 
 ### Fixed
-- The Exposé close animation ran backwards (previews jumped to the windows, then drifted back into
-  the grid).
-- Previews targeted the window rectangle including Windows' invisible resize borders and landed a few
-  pixels off; they now use the visible frame (also for the opening flight and the sidebar's zoom).
+- The sidebar's zoom-to-window ended a few pixels off the window (Windows' invisible resize borders
+  were counted as part of the window); it now lands on the visible frame.
 
 ### Performance
-- Exposé's full-screen overlays are non-layered "glass" windows (no screen-sized bitmaps copied per
-  frame) and are released 15 s after Exposé closes: about 50 MB less while open and afterwards than
-  with layered windows, and animation at the display's refresh rate.
+- Exposé's full-screen overlays are lightweight "glass" windows, rendered at the display's refresh
+  rate, and are released 15 s after Exposé closes.
 
 ## [1.1.0] - 2026-10-11
 
