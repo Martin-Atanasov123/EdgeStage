@@ -25,18 +25,15 @@ function Snap($p, $label) {
 }
 function Cmd($name) { Start-Process $app -ArgumentList '--test-cmd', $name -Wait }
 
-# The user's own settings are restored afterwards (V2 rewrites a V1 file on load).
-$settings = Join-Path $env:APPDATA "EdgeStage\settings.json"
-$settingsBackup = Join-Path $env:TEMP "edgestage-settings.backup.json"
-if (Test-Path $settings) { Copy-Item $settings $settingsBackup -Force }
-$v1Backup = Join-Path $env:APPDATA "EdgeStage\settings.v1.json"
-$hadV1Backup = Test-Path $v1Backup
-
-Get-Process EdgeStage, ThumbnailSpike -ErrorAction SilentlyContinue | Stop-Process -Force
+# The user's own settings and running EdgeStage are put back afterwards.
+Backup-UserSettings
+Write-TestSettings
+$userCopies = Stop-UserEdgeStage $app
+Get-Process ThumbnailSpike -ErrorAction SilentlyContinue | Stop-Process -Force
 $log = Join-Path $env:LOCALAPPDATA "EdgeStage\logs\edgestage-$(Get-Date -Format yyyyMMdd).log"
 $logStart = if (Test-Path $log) { (Get-Content $log).Count } else { 0 }
 
-$backdrop = Start-Process $spike -ArgumentList '--backdrop', '0', '0', '1920', '1080' -PassThru
+$backdrops = @(Start-Backdrops $spike)
 Start-Sleep -Milliseconds 700
 $sources = @(
     Start-Process $spike -ArgumentList '--source', '"Quarterly report.xlsx"', '#3CB371', 60, 60, 760, 480 -PassThru
@@ -82,14 +79,17 @@ Start-Process $app -ArgumentList '--test-show-edge' -Wait
 Start-Sleep -Milliseconds 900
 Cmd 'ExposeShow'; Start-Sleep -Milliseconds 700; Cmd 'ExposeEscape'; Start-Sleep -Milliseconds 700
 $results += Snap $p "after one more open/close of each (MRU pruned)"
+# Expose overlays are released 15 s after it closes (ExposeSession.KeepOverlaysFor), then memory is collected.
+Start-Sleep -Seconds 20
+$results += Snap $p "20 s later (idle Expose overlays released)"
 
 $results | Format-Table -AutoSize | Out-String -Width 200
 Start-Process $app -ArgumentList '--exit' -Wait
 "exited: $($p.WaitForExit(5000))"
 foreach ($s in $sources) { if (-not $s.HasExited) { $s.Kill() } }
-if (-not $backdrop.HasExited) { $backdrop.Kill() }
-if (Test-Path $settingsBackup) { Copy-Item $settingsBackup $settings -Force; Remove-Item $settingsBackup }
-if (-not $hadV1Backup -and (Test-Path $v1Backup)) { Remove-Item $v1Backup }
+foreach ($b in $backdrops) { if (-not $b.HasExited) { $b.Kill() } }
+Restore-UserSettings
+Restart-UserEdgeStage $userCopies $root
 
 $lines = Get-Content $log | Select-Object -Skip $logStart
 "log: sidebar opened=$(($lines | Select-String 'Sidebar opened').Count) dismissed=$(($lines | Select-String 'Sidebar dismissed').Count); " +

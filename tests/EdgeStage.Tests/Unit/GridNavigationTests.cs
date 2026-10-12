@@ -60,3 +60,35 @@ public sealed class GridNavigationTests
         Assert.AreEqual(-1, GridNavigation.Next([], 0, NavDirection.Right));
     }
 }
+
+[TestClass]
+public sealed class DisplayNavigationTests
+{
+    // This machine's layout: a second display to the left, 4 px lower.
+    private static readonly CardBox[] TwoSideBySide = [new(0, 0, 1920, 1080), new(-1920, 4, 1920, 1080)];
+
+    [TestMethod]
+    public void LeftAndRight_FindTheSideBySideDisplay()
+    {
+        Assert.AreEqual(1, DisplayNavigation.Neighbor(TwoSideBySide, 0, NavDirection.Left));
+        Assert.AreEqual(0, DisplayNavigation.Neighbor(TwoSideBySide, 1, NavDirection.Right));
+        Assert.AreEqual(-1, DisplayNavigation.Neighbor(TwoSideBySide, 0, NavDirection.Right), "nothing to the right");
+        Assert.AreEqual(-1, DisplayNavigation.Neighbor(TwoSideBySide, 0, NavDirection.Up), "a 4 px offset is not 'above'");
+    }
+
+    [TestMethod]
+    public void ThreeDisplays_PickTheNearestInThatDirection_AndStackedOnesForUpDown()
+    {
+        CardBox[] displays = [new(0, 0, 1920, 1080), new(1920, 0, 2560, 1440), new(-1920, 0, 1920, 1080), new(0, -1080, 1920, 1080)];
+
+        Assert.AreEqual(1, DisplayNavigation.Neighbor(displays, 0, NavDirection.Right));
+        Assert.AreEqual(2, DisplayNavigation.Neighbor(displays, 0, NavDirection.Left));
+        Assert.AreEqual(3, DisplayNavigation.Neighbor(displays, 0, NavDirection.Up));
+        Assert.AreEqual(0, DisplayNavigation.Neighbor(displays, 3, NavDirection.Down));
+        Assert.AreEqual(0, DisplayNavigation.Neighbor(displays, 2, NavDirection.Right), "the nearest, not the farthest");
+    }
+
+    [TestMethod]
+    public void SingleDisplay_HasNoNeighbors() =>
+        Assert.AreEqual(-1, DisplayNavigation.Neighbor([new(0, 0, 1920, 1080)], 0, NavDirection.Left));
+}

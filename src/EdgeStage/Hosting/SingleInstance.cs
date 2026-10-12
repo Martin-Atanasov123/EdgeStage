@@ -47,6 +47,16 @@ internal static class SingleInstance
         ExposeTypeSearch,
         ExposeEscapeKey,
         ExposeToggleGrouping,
+        ExposeCloseSelected,
+        ExposeSelectStubborn,
+        ExposeSelectOtherDisplay,
+        SettingsAppearance,
+        SettingsSidebar,
+        SettingsExpose,
+        SettingsGeneral,
+        SettingsHiddenApps,
+        SettingsClose,
+        ExposeHitTest,
     }
 #endif
 

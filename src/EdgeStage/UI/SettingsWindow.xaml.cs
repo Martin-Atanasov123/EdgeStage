@@ -187,8 +187,9 @@ internal partial class SettingsWindow : Window
         Toggle(OnlyMonitor, s => s.OnlyPointerMonitor, (s, on) => s with { OnlyPointerMonitor = on });
 
         // Exposé
-        Choice(ExposeThisMonitor, false, s => s.ExposeAllMonitors, (s, v) => s with { ExposeAllMonitors = v });
-        Choice(ExposeAllMonitors, true, s => s.ExposeAllMonitors, (s, v) => s with { ExposeAllMonitors = v });
+        Choice(ExposeEveryDisplay, ExposeMonitors.EveryDisplay, s => s.ExposeMonitors, (s, v) => s with { ExposeMonitors = v });
+        Choice(ExposeThisDisplay, ExposeMonitors.ThisDisplay, s => s.ExposeMonitors, (s, v) => s with { ExposeMonitors = v });
+        Choice(ExposeAllOnOne, ExposeMonitors.AllOnOneDisplay, s => s.ExposeMonitors, (s, v) => s with { ExposeMonitors = v });
         Choice(DensitySpacious, ExposeDensity.Spacious, s => s.ExposeDensity, (s, v) => s with { ExposeDensity = v });
         Choice(DensityAuto, ExposeDensity.Auto, s => s.ExposeDensity, (s, v) => s with { ExposeDensity = v });
         Choice(DensityDense, ExposeDensity.Dense, s => s.ExposeDensity, (s, v) => s with { ExposeDensity = v });

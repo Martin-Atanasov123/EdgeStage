@@ -20,7 +20,7 @@ namespace EdgeStage.UI;
 
 /// <summary>How Exposé lays out and filters its windows.</summary>
 public sealed record ExposeOptions(
-    bool AllMonitors = false,
+    ExposeMonitors Monitors = ExposeMonitors.EveryDisplay,
     ExposeDensity Density = ExposeDensity.Auto,
     CardSize CardSize = CardSize.Standard,
     bool Grouping = false,
@@ -34,17 +34,39 @@ public sealed record ExposeOptions(
     public static ExposeOptions Default { get; } = new();
 
     public static ExposeOptions From(AppSettings s) => new(
-        s.ExposeAllMonitors, s.ExposeDensity, s.CardSize, s.ExposeGrouping, s.ExposeShowTitles,
+        s.ExposeMonitors, s.ExposeDensity, s.CardSize, s.ExposeGrouping, s.ExposeShowTitles,
         s.ExposeShowIcons, s.ExposeSearch, s.UseMotion, s.AnimationSpeed, Instant: !s.Animations);
 }
 
+/// <summary>What an Exposé overlay asks of the session that coordinates all overlays.</summary>
+internal interface IExposeHost
+{
+    /// <summary>Close every overlay (Esc, background click…); optionally return to the window active before.</summary>
+    void RequestClose(ExposeWindow from, string reason, bool immediate, bool returnToPrevious);
+
+    /// <summary>Switch to <paramref name="card"/>'s window; every overlay closes.</summary>
+    void RequestActivate(ExposeWindow from, CardViewModel card);
+
+    /// <summary>The search text changed in one overlay; it applies to all of them.</summary>
+    void FilterChanged(ExposeWindow from, string filter);
+
+    /// <summary>An arrow key reached the edge of this overlay's grid: continue on the neighboring display.</summary>
+    void NavigateBeyond(ExposeWindow from, NavDirection direction);
+
+    /// <summary>The overlay lost activation (to another overlay, or to another app).</summary>
+    void OverlayDeactivated(ExposeWindow from);
+
+    void HideApp(string processName);
+}
+
 /// <summary>
-/// Exposé: every window of the monitor (or of all monitors) at once, in an adaptive grid on a dimmed
-/// full-monitor overlay. Opening, the previews fly from the windows' real positions into the grid;
-/// closing, they fly back (the chosen window comes forward under the overlay at the same time).
-/// Like the sidebar, everything costly exists only while it is on screen.
+/// One Exposé overlay: the windows of one display (or of all displays) at once, in an adaptive grid on
+/// a dimmed full-monitor overlay. Opening, the previews fly from the windows' real positions into the
+/// grid; closing, they fly back (the chosen window comes forward under the overlay at the same time).
+/// <see cref="ExposeSession"/> opens one overlay per display and coordinates them. Like the sidebar,
+/// everything costly exists only while it is on screen.
 /// </summary>
-public partial class ExposeWindow : Window
+internal partial class ExposeWindow : Window
 {
     private const double OpenDurationMs = 300;
     private const double CloseDurationMs = 230;
@@ -60,12 +82,13 @@ public partial class ExposeWindow : Window
     private readonly CornerMaskWindow _mask;
     private readonly DispatcherTimer _sourceSizeTimer;
     private readonly nint _hwnd;
+    private readonly IExposeHost _host;
 
     private MonitorArea? _monitor;
+    private Func<WindowInfo, bool> _listed = _ => true;
     private AppSettings _settings = AppSettings.Default;
     private ExposeOptions _options = ExposeOptions.Default;
     private CardMetrics _metrics = CardMetrics.Default;
-    private nint _previous;
     private ExposeGridPanel? _grid;
     private readonly HoverGuard _hover = new();
 
@@ -81,13 +104,15 @@ public partial class ExposeWindow : Window
     /// <summary>Uniform scale + offset that maps a card's preview onto its window (DIPs, container coordinates).</summary>
     private sealed record Flight(FrameworkElement Container, double Scale, Vector Offset, bool Flies);
 
-    public ExposeWindow(WindowTracker tracker)
+    public ExposeWindow(WindowTracker tracker, IExposeHost host)
     {
         InitializeComponent();
         _tracker = tracker;
+        _host = host;
         DataContext = _vm;
         _hwnd = new WindowInteropHelper(this).EnsureHandle();
-        _mask = new CornerMaskWindow(_hwnd);
+        GlassWindow.Apply(this, _hwnd);
+        _mask = new CornerMaskWindow(_hwnd, glass: true);
         _thumbs = new ThumbnailLayoutCoordinator(this, CardList, Scroller, _mask);
         _thumbs.SourceLost += card => RemoveCard(card, "source window gone");
         _thumbs.CardOpacity = CardThumbnailOpacity;
@@ -123,15 +148,11 @@ public partial class ExposeWindow : Window
             else if (e.PropertyName == nameof(WindowListViewModel.SelectedIndex) && IsOpen && !_animating)
                 _thumbs.Update();
         };
+        // Another overlay or another app took the foreground; the session tells them apart.
         Deactivated += (_, _) =>
         {
-            // Another window took the foreground (Alt+Tab, a notification click…): get out of the way.
             if (IsOpen && !_closing)
-            {
-                // Never pull the user back: the window they switched to keeps the foreground.
-                Log.Debug($"Exposé deactivated; foreground now belongs to {ForegroundProcessName()}.");
-                BeginClose("deactivated", immediate: true, target: null);
-            }
+                _host.OverlayDeactivated(this);
         };
         PreviewKeyDown += OnPreviewKeyDown;
         PreviewTextInput += OnPreviewTextInput;
@@ -155,15 +176,36 @@ public partial class ExposeWindow : Window
     public bool IsOpen { get; private set; }
     public int CardCount => _vm.Cards.Count;
     public int LiveThumbnailCount => _thumbs.Count;
+    internal nint Handle => _hwnd;
+    internal MonitorArea? Monitor => _monitor;
+    internal string Filter => _vm.Filter;
+    internal CardViewModel? Selected => _vm.Selected;
 
-    /// <summary>Raised once Exposé has closed and released its resources, with the reason.</summary>
-    public event Action<string>? Dismissed;
+    /// <summary>Applies the session-wide search text.</summary>
+    internal void SetFilter(string filter)
+    {
+        if (IsOpen)
+            _vm.Filter = filter;
+    }
 
-    /// <summary>Windows refused the switch (card title, result).</summary>
-    public event Action<string, ActivationResult>? ActivationFailed;
+    /// <summary>Removes the highlight (keyboard focus moved to another display's overlay).</summary>
+    internal void ClearSelection()
+    {
+        if (IsOpen)
+            _vm.SelectedIndex = -1;
+    }
 
-    /// <summary>The user chose "Never show this app" for the given process name.</summary>
-    public event Action<string>? HideAppRequested;
+    /// <summary>Takes the keyboard after an arrow key crossed over from a neighboring display.</summary>
+    internal void EnterFrom(NavDirection direction)
+    {
+        if (!IsOpen)
+            return;
+        if (_vm.Cards.Count > 0)
+            _vm.SelectedIndex = direction == NavDirection.Left ? _vm.Cards.Count - 1 : 0;
+        Activate();
+        Focus();
+        ScrollSelectedIntoView();
+    }
 
     /// <summary>Card corner radius and padding follow the sidebar's appearance settings.</summary>
     public void ApplyMetrics(CardMetrics metrics)
@@ -179,7 +221,11 @@ public partial class ExposeWindow : Window
 
     // ---- open / close ----------------------------------------------------------------------------
 
-    public void Open(MonitorArea monitor, AppSettings settings, ExposeOptions options)
+    /// <param name="listed">Which windows this overlay shows (e.g. those on its display).</param>
+    /// <param name="foreground">The window that was active before Exposé (marked; first in MRU order).</param>
+    /// <param name="activate">Take the keyboard (the overlay on the display under the pointer).</param>
+    public void Open(MonitorArea monitor, AppSettings settings, ExposeOptions options, Func<WindowInfo, bool> listed,
+        nint foreground, bool activate)
     {
         if (IsOpen)
             return;
@@ -187,23 +233,22 @@ public partial class ExposeWindow : Window
             FinishClose();
 
         _monitor = monitor;
+        _listed = listed;
         _settings = settings;
         _options = options;
         ApplyMetrics(settings.CardMetrics);
         SearchBox.Visibility = options.Search ? Visibility.Visible : Visibility.Hidden;
 
-        // Remember where to return on Esc, before EdgeStage itself takes the foreground.
-        _previous = User32.GetForegroundWindow();
         List<WindowInfo> windows = WindowEnumerator.Enumerate().Where(IsListed).ToList();
-        _tracker.Mru.PruneWhere(User32.IsWindow);
-        List<WindowInfo> ordered = _tracker.Mru.Order(windows, w => w.Hwnd, _previous);
+        List<WindowInfo> ordered = _tracker.Mru.Order(windows, w => w.Hwnd, foreground);
 
         _vm.Grouping = options.Grouping;
-        _vm.Load(ordered, _previous, ordered.Count > 0 ? 0 : -1);
+        // Only the overlay that takes the keyboard starts with a selection.
+        _vm.Load(ordered, foreground, activate && ordered.Count > 0 ? 0 : -1);
         for (int i = 0; i < ordered.Count; i++)
             _icons.Apply(_vm.Cards[i], ordered[i]);
         ShowFilterText();
-        Log.Debug($"Exposé listing {ordered.Count} windows ({(options.AllMonitors ? "all monitors" : "this monitor")}).");
+        Log.Debug($"Exposé overlay on {monitor.Bounds} lists {ordered.Count} windows ({options.Monitors}).");
 
         // Cover the whole monitor (taskbar included), in physical pixels.
         RECT b = monitor.Bounds;
@@ -220,9 +265,13 @@ public partial class ExposeWindow : Window
         _thumbs.Opacity = 0;
         Root.IsHitTestVisible = false;
         IsOpen = true;
+        ShowActivated = activate;
         Show();
-        Activate();
-        Focus();
+        if (activate)
+        {
+            Activate();
+            Focus();
+        }
 
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
         {
@@ -235,59 +284,27 @@ public partial class ExposeWindow : Window
             CardList.Opacity = 1;
             _thumbs.Opacity = 255;
             BeginAnimation(opening: true);
-            Log.Info($"Exposé opened on monitor {monitor.Bounds} @ {monitor.Dpi} dpi: {_vm.Cards.Count} windows, " +
+            Log.Info($"Exposé opened on monitor {monitor.Bounds} @ {monitor.Dpi} dpi{(activate ? " (keyboard)" : "")}: {_vm.Cards.Count} windows, " +
                      $"{_thumbs.Count} live thumbnails, {_grid?.CardBoxes().Count ?? 0} cards laid out.");
         });
         _sourceSizeTimer.Start();
     }
 
-    /// <summary>Closes Exposé and returns to the window that was active before it opened.</summary>
-    public void Dismiss(string reason, bool immediate = false, bool returnToPrevious = true)
+    /// <summary>
+    /// Starts closing (called by the session for every overlay). Hooks and timers stop at once;
+    /// the previews fly back, <paramref name="target"/> (the chosen window) on top.
+    /// </summary>
+    internal void BeginClose(string reason, bool immediate, CardViewModel? target)
     {
         if (!IsOpen)
             return;
-        nint previous = _previous;
-        bool canReturn = returnToPrevious && previous != 0 && User32.IsWindow(previous) && previous != _hwnd;
-        // Closing state first: activating the previous window deactivates this one synchronously.
-        BeginClose(reason, immediate, target: null);
-        if (canReturn)
-            _ = ReturnToPreviousAsync(previous); // while this process still holds the foreground
-    }
-
-    private static async Task ReturnToPreviousAsync(nint previous)
-    {
-        ActivationResult result = await WindowActivator.ActivateAsync(previous);
-        if (result.Outcome != ActivationOutcome.Activated)
-            Log.Info($"Could not return to the previous window 0x{previous:X}: {result.Outcome} ({result.Detail}).");
-    }
-
-    private static string ForegroundProcessName()
-    {
-        nint fg = User32.GetForegroundWindow();
-        if (fg == 0)
-            return "nobody";
-        User32.GetWindowThreadProcessId(fg, out uint pid);
-        try
-        {
-            using var process = Process.GetProcessById((int)pid);
-            return $"{process.ProcessName} (0x{fg:X})";
-        }
-        catch (ArgumentException)
-        {
-            return $"pid {pid}";
-        }
-    }
-
-    private void BeginClose(string reason, bool immediate, CardViewModel? target)
-    {
         IsOpen = false;
         _closing = true;
         _sourceSizeTimer.Stop();
         _tracker.WindowEvent -= OnWindowEvent;
         _tracker.EndDetailedTracking();
         Root.IsHitTestVisible = false;
-        Log.Info($"Exposé dismissed: {reason}.");
-        Dismissed?.Invoke(reason);
+        Log.Info($"Exposé overlay on {_monitor?.Bounds} dismissed: {reason}.");
 
         if (immediate || !IsVisible)
         {
@@ -333,6 +350,7 @@ public partial class ExposeWindow : Window
         ExposeGrid grid = ExposeLayout.Compute(input);
         Grid?.Configure(grid, spacing, headerHeight, areaHeight);
         EmptyText.Visibility = _vm.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
+        EmptyText.Text = _vm.HasFilter ? "No matching windows" : "No windows on this display";
         CountText.Text = _vm.HasFilter ? $"{_vm.Cards.Count} of {_vm.AllCards.Count()}" : "";
         Scroller.VerticalScrollBarVisibility = grid.NeedsScroll ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden;
     }
@@ -542,10 +560,7 @@ public partial class ExposeWindow : Window
     {
         if (!TestHooks.IsListed(window) || _settings.IsExcluded(window.ProcessName))
             return false;
-        if (!_options.AllMonitors && _monitor is not null
-            && User32.MonitorFromWindow(window.Hwnd, MONITOR_DEFAULTTONEAREST) != _monitor.Handle)
-            return false;
-        return true;
+        return _listed(window);
     }
 
     /// <summary>Applies changed settings to an open Exposé (e.g. an app was just hidden).</summary>
@@ -571,7 +586,7 @@ public partial class ExposeWindow : Window
                 HandleEscape();
                 break;
             case Key.Back when _vm.HasFilter:
-                _vm.Filter = _vm.Filter[..^1];
+                _host.FilterChanged(this, _vm.Filter[..^1]);
                 break;
             case Key.Left:
                 Navigate(NavDirection.Left);
@@ -623,9 +638,9 @@ public partial class ExposeWindow : Window
     private void HandleEscape()
     {
         if (_vm.HasFilter)
-            _vm.Filter = "";
+            _host.FilterChanged(this, "");
         else
-            Dismiss("escape");
+            _host.RequestClose(this, "escape", immediate: false, returnToPrevious: true);
     }
 
     private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
@@ -635,7 +650,7 @@ public partial class ExposeWindow : Window
             return;
         if (text == " " && !_vm.HasFilter)
             return;
-        _vm.Filter += text;
+        _host.FilterChanged(this, _vm.Filter + text);
         e.Handled = true;
     }
 
@@ -644,8 +659,13 @@ public partial class ExposeWindow : Window
         if (Grid is not { } grid)
             return;
         int next = GridNavigation.Next(grid.CardBoxes(), _vm.SelectedIndex, direction);
-        if (next >= 0)
-            _vm.SelectedIndex = next;
+        if (next < 0 || (next == _vm.SelectedIndex && _vm.SelectedIndex >= 0))
+        {
+            // At the edge of this display's grid (or nothing here): continue on the next display.
+            _host.NavigateBeyond(this, direction);
+            return;
+        }
+        _vm.SelectedIndex = next;
         ScrollSelectedIntoView();
     }
 
@@ -662,6 +682,9 @@ public partial class ExposeWindow : Window
         int index = _vm.Cards.IndexOf(card);
         if (index != _vm.SelectedIndex)
             _vm.SelectedIndex = index;
+        // The keyboard follows the pointer across displays, so Enter acts on the highlighted card.
+        if (!IsActive)
+            Activate();
     }
 
     private void OnCardClicked(object sender, MouseButtonEventArgs e)
@@ -673,7 +696,8 @@ public partial class ExposeWindow : Window
         }
     }
 
-    private void OnBackgroundClicked(object sender, MouseButtonEventArgs e) => Dismiss("clicked background");
+    private void OnBackgroundClicked(object sender, MouseButtonEventArgs e) =>
+        _host.RequestClose(this, "clicked background", immediate: false, returnToPrevious: true);
 
     private void OnGroupHeaderClicked(object sender, MouseButtonEventArgs e)
     {
@@ -697,7 +721,7 @@ public partial class ExposeWindow : Window
         if ((e.OriginalSource as FrameworkElement)?.DataContext is not CardViewModel { ProcessName.Length: > 0 } card)
             return;
         e.Handled = true;
-        HideAppRequested?.Invoke(card.ProcessName);
+        _host.HideApp(card.ProcessName);
     }
 
 #if DEBUG
@@ -721,43 +745,53 @@ public partial class ExposeWindow : Window
     internal void TypeForTest(string text)
     {
         if (IsOpen && _options.Search)
-            _vm.Filter += text;
+            _host.FilterChanged(this, _vm.Filter + text);
     }
 
     internal void EscapeKeyForTest() => HandleEscape();
 
+    /// <summary>
+    /// Which window Windows' hit-testing finds at the selected card's center ("overlay", "mask" or
+    /// "other"): the full-screen corner mask must let clicks through to the overlay.
+    /// </summary>
+    internal string HitTestSelectedForTest()
+    {
+        if (_vm.Selected is not { } card || CardList.ItemContainerGenerator.ContainerFromItem(card) is not FrameworkElement container)
+            return "no selection";
+        Point center = container.PointToScreen(new Point(container.ActualWidth / 2, container.ActualHeight / 2));
+        nint hit = User32.WindowFromPoint(new POINT((int)center.X, (int)center.Y));
+        return hit == _hwnd ? "overlay" : hit == new WindowInteropHelper(_mask).Handle ? "mask" : $"other 0x{hit:X}";
+    }
+
+    internal void CloseSelectedForTest()
+    {
+        if (_vm.Selected is { } card)
+            WindowActions.RequestClose(card);
+    }
+
+    internal void SelectTitleForTest(string title)
+    {
+        int index = _vm.Cards.ToList().FindIndex(c => c.Title == title);
+        if (index < 0)
+            return;
+        _vm.SelectedIndex = index;
+        Activate();
+    }
+
     internal void ToggleGroupingForTest() => _vm.Grouping = !_vm.Grouping;
 
     internal string DescribeForTest() =>
-        $"open={IsOpen} cards={_vm.Cards.Count} groups={_vm.GroupCount} filter='{_vm.Filter}' thumbs={_thumbs.Count} selected={_vm.SelectedIndex} " +
+        $"[{_monitor?.Bounds}{(IsActive ? " active" : "")}] open={IsOpen} cards={_vm.Cards.Count} notice='{_vm.Selected?.Notice}' groups={_vm.GroupCount} filter='{_vm.Filter}' thumbs={_thumbs.Count} selected={_vm.SelectedIndex} " +
         $"boxes=[{string.Join("; ", Grid?.CardBoxes().Select(b => $"{b.X:F0},{b.Y:F0} {b.Width:F0}x{b.Height:F0}") ?? [])}]";
 #endif
 
-    /// <summary>
-    /// The chosen window is activated at once (this process still holds the foreground); the
-    /// previews fly back to their windows meanwhile and the overlay disappears at the end.
-    /// </summary>
-    private async void ActivateCard(CardViewModel card)
+    /// <summary>Switches to the card's window: the session closes every overlay and activates it.</summary>
+    private void ActivateCard(CardViewModel card)
     {
         if (!IsOpen || _animating)
             return;
         card.Notice = null;
-        // Closing state first: the activation deactivates this window synchronously.
-        BeginClose("window selected", immediate: false, target: card);
-        Task<ActivationResult> activation = WindowActivator.ActivateAsync(card.Hwnd);
-        try
-        {
-            ActivationResult result = await activation;
-            if (result.Outcome == ActivationOutcome.Refused)
-            {
-                Log.Warn($"Activation refused for 0x{card.Hwnd:X} ({card.ProcessName}): {result.Detail}");
-                ActivationFailed?.Invoke(card.Title, result);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error($"Activation of 0x{card.Hwnd:X} failed", ex);
-        }
+        _host.RequestActivate(this, card);
     }
 
     // ---- helpers -----------------------------------------------------------------------------------

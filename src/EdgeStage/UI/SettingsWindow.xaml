@@ -452,15 +452,20 @@
 
                         <TextBlock Text="WINDOWS" Style="{StaticResource SectionHeader}" />
                         <Border Style="{StaticResource Row}">
-                            <Grid>
-                                <TextBlock Text="Show windows from" VerticalAlignment="Center" />
-                                <Border Style="{StaticResource SegmentGroup}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <RadioButton x:Name="ExposeThisMonitor" Content="This monitor" GroupName="ExposeMonitors" Style="{StaticResource Segment}" />
-                                        <RadioButton x:Name="ExposeAllMonitors" Content="All monitors" GroupName="ExposeMonitors" Style="{StaticResource Segment}" />
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Displays" VerticalAlignment="Center" />
+                                    <Border Style="{StaticResource SegmentGroup}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="ExposeEveryDisplay" Content="Every display" GroupName="ExposeMonitors" Style="{StaticResource Segment}" />
+                                            <RadioButton x:Name="ExposeThisDisplay" Content="This display" GroupName="ExposeMonitors" Style="{StaticResource Segment}" />
+                                            <RadioButton x:Name="ExposeAllOnOne" Content="All on one" GroupName="ExposeMonitors" Style="{StaticResource Segment}" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0"
+                                           Text="Every display: Exposé appears on each monitor with that monitor's windows; ← → move between them. This display: only the monitor under the pointer. All on one: every window, gathered on the monitor under the pointer." />
+                            </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Row}">
                             <Grid>

@@ -65,7 +65,7 @@
 | Window list | Every switchable window on the current virtual desktop, on all monitors, most-recently-used first with the current window marked. Each window of an app gets its own card. Uses the same structural rules as Alt+Tab (never titles). EdgeStage, the desktop, the taskbar, tool windows, owned dialogs and cloaked windows are excluded. |
 | Switching | Restores minimized windows, activates the window (or its open dialog). Minimized windows zoom to where they will reappear. If Windows refuses the switch (for example an administrator window) a tray notification explains. |
 | Closing | Esc, choosing a window, clicking outside (shortcut mode), or moving the pointer away for 400 ms (configurable). The first Esc clears a search, the second closes. |
-| Exposé | Covers the monitor under the pointer and shows that monitor's windows (or all monitors' — a setting). Card size adapts to the number of windows (density: spacious, auto, denser); with very many windows the grid keeps a readable size and scrolls. Minimized windows and windows on other monitors fade in instead of flying. Pressing the sidebar shortcut switches to the sidebar. |
+| Exposé | With several monitors it appears on **every display at once**, each showing the windows on that display, so you can pick any window wherever it is; ← → at the edge of a grid jump to the neighboring display, and search filters all of them. Settings › Exposé › Displays can limit it to the display under the pointer, or gather every window on that one display. Card size adapts to the number of windows (density: spacious, auto, denser); with very many windows the grid keeps a readable size and scrolls. Minimized windows and windows on other monitors fade in instead of flying. Pressing the sidebar shortcut switches to the sidebar. |
 | Overflow | Fixed-size cards; the list scrolls with a slim scrollbar and previews are clipped correctly while scrolling. |
 | Hold to switch | With the shortcut's modifiers held, press its key again to step (add Shift to go back); release to switch. A quick tap switches to the previous window. Needs a shortcut with a modifier. |
 | Robustness | Survives Explorer restarts (tray icon re-added), display changes and lock/unlock; single instance. |
@@ -118,7 +118,7 @@ Not included: virtual-desktop management (Mission Control spaces), window tiling
   },
   "expose": {
     "hotkey": "Ctrl+Alt+Up",
-    "allMonitors": false,
+    "monitors": "EveryDisplay",     // EveryDisplay | ThisDisplay | AllOnOneDisplay
     "density": "Auto",              // Spacious | Auto | Dense
     "grouping": false,
     "showIcons": true,
@@ -221,20 +221,21 @@ Key decisions (evidence in [docs/spike-findings.md](docs/spike-findings.md)):
 - While an edge-opened sidebar is visible, Esc is reserved for closing it.
 
 **Platform**
-- Windows 10, multiple monitors with mixed DPI, and display scaling other than 100 % are implemented but were **not tested on real hardware** (see [docs/TESTING.md](docs/TESTING.md)).
+- Two monitors at 100 % were tested (scripted, synthetic windows). Windows 10, mixed-DPI monitors and display scaling other than 100 % are implemented but were **not tested on real hardware** (see [docs/TESTING.md](docs/TESTING.md)).
 - UWP/Store apps can show a generic icon when Windows exposes none.
 
-## 📊 Resource use (measured with 1.1)
+## 📊 Resource use (measured)
 
-Machine: Windows 11 Pro build 26300 (Insider), AMD Ryzen 5 5600X (6 cores/12 threads), 16 GB RAM, GeForce GTX 1650, one 1920×1080 60 Hz monitor at 100 %, Balanced power plan, .NET 10.0.8. Method: `tools\validation\measure-resources.ps1` (process CPU time, working set, private bytes, handles, GDI/USER objects).
+Machine: Windows 11 Pro build 26300 (Insider), AMD Ryzen 5 5600X (6 cores/12 threads), 16 GB RAM, GeForce GTX 1650, two 1920×1080 monitors at 100 %, .NET 10.0.8. Method: `tools\validation\measure-resources.ps1` (process CPU time, working set, private bytes, handles, GDI/USER objects). Self-contained Release build of 2.0.
 
-| State (Release build) | CPU | Working set | Private | Handles / GDI / USER |
+| State | CPU | Working set | Private | Handles / GDI / USER |
 |---|---|---|---|---|
-| 😴 Idle, sidebar hidden, edge polling on, 60 s, self-contained | 62 ms total = 0.10 % of one core (0.009 % of the CPU) | 104 MB | 63 MB | ~690 / 35 / 34 |
-| 😴 Same, framework-dependent | 46 ms total = 0.08 % of one core | 102 MB | 62 MB | ~645 / 35 / 34 |
-| 👀 Sidebar open and idle, 15 s | 94 ms total = 0.6 % of one core | 130 MB | 89 MB | ~700 / 35 / 40 |
+| 😴 Idle, sidebar hidden, edge polling on, 60 s | 78 ms total = 0.13 % of one core | 98 MB | 64 MB | ~650 / 53 / 30 |
+| 👀 Sidebar open and idle, 15 s | 63 ms = 0.4 % of one core | 136 MB | 93 MB | ~700 / 59 / 49 |
+| 🪟 Exposé open on both monitors and idle, 15 s | 15 ms = 0.1 % of one core | 144 MB | 142 MB | ~730 / 100 / 66 |
+| 😴 Hidden again after Exposé | — | 131 MB | 131 MB | ~705 / 76 / 44 |
 
-🎬 Animations: open 181-195 ms (13-14 frames), close 140-156 ms (9-12 frames) at 60 Hz. 🧹 Leak check: 254 open/close cycles plus window churn; handles, GDI and USER objects stay flat, memory plateaus, 0 DWM registrations left at exit.
+🎬 Animations: sidebar open ~185 ms, close ~145 ms; Exposé runs at the display's refresh rate. 🧹 Leak check: 100 sidebar and 50 Exposé open/close cycles plus window churn; handles, GDI and USER objects stay flat, memory returns to its starting level, 0 DWM registrations left at exit. Exposé's overlay windows are released 15 s after it closes. Details in [docs/TESTING.md](docs/TESTING.md).
 
 ## 🗺️ Roadmap
 

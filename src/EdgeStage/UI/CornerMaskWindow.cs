@@ -38,10 +38,12 @@ internal sealed class CornerMaskWindow : Window
     private readonly List<Path> _paths = [];
     private readonly nint _hwnd;
 
-    public CornerMaskWindow(nint owner)
+    /// <param name="glass">Non-layered "glass" window (see <see cref="GlassWindow"/>): for full-screen
+    /// owners such as Exposé, where a layered mask would hold screen-sized bitmaps.</param>
+    public CornerMaskWindow(nint owner, bool glass = false)
     {
         WindowStyle = WindowStyle.None;
-        AllowsTransparency = true;
+        AllowsTransparency = !glass;
         Background = Brushes.Transparent;
         ShowInTaskbar = false;
         Topmost = true;
@@ -60,6 +62,8 @@ internal sealed class CornerMaskWindow : Window
         _hwnd = helper.EnsureHandle();
         long ex = User32.GetWindowLongPtr(_hwnd, GWL_EXSTYLE);
         User32.SetWindowLongPtr(_hwnd, GWL_EXSTYLE, (nint)(ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT));
+        if (glass)
+            GlassWindow.Apply(this, _hwnd, clickThrough: true); // WS_EX_TRANSPARENT passes clicks only for layered windows
     }
 
     /// <summary>Corner radius in DIPs (follows the card corner radius setting); 0 disables the mask.</summary>
@@ -104,7 +108,11 @@ internal sealed class CornerMaskWindow : Window
     /// <param name="opacity">Follows the sidebar's fade so the corners never show while it is hidden.</param>
     public void Apply(IReadOnlyList<Item> items, double scale, double opacity)
     {
-        Opacity = Math.Clamp(opacity, 0, 1);
+        // Window opacity works only for layered windows; a glass mask fades its content instead.
+        if (AllowsTransparency)
+            Opacity = Math.Clamp(opacity, 0, 1);
+        else
+            _canvas.Opacity = Math.Clamp(opacity, 0, 1);
         int needed = items.Count * 4;
         while (_paths.Count < needed)
         {

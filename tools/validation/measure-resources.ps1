@@ -9,12 +9,8 @@ param(
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\guard.ps1"
 Assert-NoFullscreenApp
-# The user's own settings are restored afterwards (V2 rewrites a V1 file on load).
-$settings = Join-Path $env:APPDATA "EdgeStage\settings.json"
-$settingsBackup = Join-Path $env:TEMP "edgestage-settings.backup.json"
-if (Test-Path $settings) { Copy-Item $settings $settingsBackup -Force }
-$v1Backup = Join-Path $env:APPDATA "EdgeStage\settings.v1.json"
-$hadV1Backup = Test-Path $v1Backup
+# The user's own settings and running EdgeStage are put back afterwards.
+Backup-UserSettings
 Add-Type -Namespace Meas -Name N -MemberDefinition @'
 [DllImport("kernel32.dll")] public static extern System.IntPtr OpenProcess(uint access, bool inherit, uint pid);
 [DllImport("kernel32.dll")] public static extern bool CloseHandle(System.IntPtr h);
@@ -39,7 +35,7 @@ function Snapshot($p) {
     }
 }
 
-Get-Process EdgeStage -ErrorAction SilentlyContinue | Stop-Process -Force
+$userCopies = Stop-UserEdgeStage $Exe
 Start-Sleep -Milliseconds 500
 $p = Start-Process $Exe -ArgumentList '--autostart' -PassThru
 Start-Sleep -Seconds 4
@@ -81,9 +77,13 @@ $el3 = ((Get-Date) - $t2).TotalSeconds; $cpu3 = $e1.CpuSeconds - $e0.CpuSeconds
 "  CPU time used: $([math]::Round($cpu3*1000,1)) ms  =>  $([math]::Round(100*$cpu3/$el3,3)) % of one core"
 "  open:  $($e1 | ConvertTo-Json -Compress)"
 
-# Closed again: idle cost must return to the hidden baseline.
+# Closed again: idle cost must return to the hidden baseline once the overlays are released
+# (15 s after Expose closes; see ExposeSession.KeepOverlaysFor).
 Start-Process $Exe -ArgumentList '--expose' -Wait
 Start-Sleep -Seconds 3
+$k = Snapshot $p
+"[$Label] 3 s after Expose closed (overlays still kept): $($k | ConvertTo-Json -Compress)"
+Start-Sleep -Seconds 17
 $h0 = Snapshot $p; $t3 = Get-Date
 Start-Sleep -Seconds 20
 $h1 = Snapshot $p
@@ -94,5 +94,5 @@ $el4 = ((Get-Date) - $t3).TotalSeconds; $cpu4 = $h1.CpuSeconds - $h0.CpuSeconds
 
 Start-Process $Exe -ArgumentList '--exit' -Wait
 "exited: $($p.WaitForExit(5000))"
-if (Test-Path $settingsBackup) { Copy-Item $settingsBackup $settings -Force; Remove-Item $settingsBackup }
-if (-not $hadV1Backup -and (Test-Path $v1Backup)) { Remove-Item $v1Backup }
+Restore-UserSettings
+Restart-UserEdgeStage $userCopies ((Resolve-Path "$PSScriptRoot\..\..").Path)

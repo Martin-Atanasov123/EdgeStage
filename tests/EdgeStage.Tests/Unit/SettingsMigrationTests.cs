@@ -98,7 +98,7 @@ public sealed class SettingsMigrationTests
             SidebarGrouping = true,
             EdgeInFullscreen = true,
             ExposeHotkey = new Hotkey(HotkeyModifiers.Control | HotkeyModifiers.Shift, 0x45),
-            ExposeAllMonitors = true,
+            ExposeMonitors = ExposeMonitors.AllOnOneDisplay,
             ExposeDensity = ExposeDensity.Dense,
             ExposeGrouping = true,
             ExposeShowIcons = false,

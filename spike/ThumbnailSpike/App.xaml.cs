@@ -20,7 +20,7 @@ public partial class App : Application
 
         try
         {
-            if (args.Length >= 3 && args[0] is "--source" or "--source-flip" or "--source-min" or "--source-retitle")
+            if (args.Length >= 3 && args[0] is "--source" or "--source-flip" or "--source-min" or "--source-retitle" or "--source-stubborn")
             {
                 var color = (Color)ColorConverter.ConvertFromString(args[2]);
                 // Optional placement: <x> <y> <width> <height> after the color.
@@ -51,6 +51,11 @@ public partial class App : Application
                     int step = 0;
                     timer.Tick += (_, _) => window.Title = $"{args[1]} — step {++step} — " + new string('x', 20 * (step % 4));
                     timer.Start();
+                }
+                else if (args[0] == "--source-stubborn")
+                {
+                    // Ignores close requests, like an app showing "Save changes?" (ended by the test script).
+                    window.Closing += (_, e) => e.Cancel = true;
                 }
                 else if (args[0] == "--source-min")
                 {

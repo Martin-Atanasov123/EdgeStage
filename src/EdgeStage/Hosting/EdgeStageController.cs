@@ -36,7 +36,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
     private readonly WindowTracker _tracker = new();
     private readonly EdgeTriggerService _edge;
     private readonly SidebarWindow _sidebar;
-    private readonly ExposeWindow _expose;
+    private readonly ExposeSession _expose;
     private readonly TrayIcon _tray;
     private SettingsWindow? _settingsWindow;
     private MonitorLayout _layout;
@@ -79,7 +79,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             Log.Info($"Hiding app '{app}' from the sidebar.");
             UpdateSettings(Settings with { ExcludedApps = [.. Settings.ExcludedApps, app] });
         };
-        _expose = new ExposeWindow(_tracker);
+        _expose = new ExposeSession(_tracker);
         _expose.Dismissed += OnExposeDismissed;
         _expose.HideAppRequested += app =>
         {
@@ -191,7 +191,7 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
                 System.Globalization.CultureInfo.InvariantCulture, out double animationScale))
             options = options with { AnimationScale = animationScale };
 #endif
-        _expose.Open(_layout.Monitors[index], Settings, options);
+        _expose.Open(_layout.Monitors, index, Settings, options);
     }
 
     public void ToggleExpose()
@@ -516,12 +516,12 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
         }
         if (message == SingleInstance.TestShowEdgeMessage)
         {
-            ShowSidebar(SidebarOpenMode.Edge);
+            ShowSidebar(SidebarOpenMode.Edge, PrimaryMonitorIndex);
             return true;
         }
         if (message == SingleInstance.TestOpenSettingsMessage)
         {
-            OpenSettings();
+            OpenSettingsForTest(SettingsPage.Appearance);
             return true;
         }
         if (message == SingleInstance.TestTrayMenuMessage)
@@ -539,6 +539,14 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
     }
 
 #if DEBUG
+    /// <summary>Validation captures draw over topmost backdrops, so the settings window goes on top of them.</summary>
+    private void OpenSettingsForTest(SettingsPage page)
+    {
+        OpenSettings(page);
+        if (_settingsWindow is not null)
+            _settingsWindow.Topmost = true;
+    }
+
     /// <summary>Tests draw over a backdrop on the primary monitor, wherever the pointer is.</summary>
     private int PrimaryMonitorIndex => Math.Max(0, _layout.Monitors.ToList().FindIndex(m => m.IsPrimary));
 
@@ -558,6 +566,16 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             case SingleInstance.TestCommand.ExposeTypeSearch: _expose.TypeForTest("REPORT"); break;
             case SingleInstance.TestCommand.ExposeEscapeKey: _expose.EscapeKeyForTest(); break;
             case SingleInstance.TestCommand.ExposeToggleGrouping: _expose.ToggleGroupingForTest(); break;
+            case SingleInstance.TestCommand.ExposeCloseSelected: _expose.CloseSelectedForTest(); break;
+            case SingleInstance.TestCommand.ExposeHitTest: Log.Info("Exposé hit test at the selected card: " + _expose.HitTestSelectedForTest()); break;
+            case SingleInstance.TestCommand.ExposeSelectStubborn: _expose.SelectTitleForTest("Stubborn window"); break;
+            case SingleInstance.TestCommand.ExposeSelectOtherDisplay: _expose.SelectTitleForTest("Second display window"); break;
+            case SingleInstance.TestCommand.SettingsAppearance: OpenSettingsForTest(SettingsPage.Appearance); break;
+            case SingleInstance.TestCommand.SettingsSidebar: OpenSettingsForTest(SettingsPage.Sidebar); break;
+            case SingleInstance.TestCommand.SettingsExpose: OpenSettingsForTest(SettingsPage.Expose); break;
+            case SingleInstance.TestCommand.SettingsGeneral: OpenSettingsForTest(SettingsPage.General); break;
+            case SingleInstance.TestCommand.SettingsHiddenApps: OpenSettingsForTest(SettingsPage.HiddenApps); break;
+            case SingleInstance.TestCommand.SettingsClose: _settingsWindow?.Close(); break;
             case SingleInstance.TestCommand.SidebarExposeButton:
                 ShowSidebar(SidebarOpenMode.Hotkey, PrimaryMonitorIndex);
                 _dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => _sidebar.ClickExposeButtonForTest());

@@ -1,10 +1,11 @@
 <Window x:Class="EdgeStage.UI.ExposeWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:ClassModifier="internal"
         xmlns:ui="clr-namespace:EdgeStage.UI"
         Title="EdgeStage Exposé"
         WindowStyle="None"
-        AllowsTransparency="True"
+        AllowsTransparency="False"
         Background="Transparent"
         ShowInTaskbar="False"
         Topmost="True"
@@ -15,9 +16,10 @@
         Focusable="True"
         FontFamily="{StaticResource UiFont}">
     <!--
-        Full-monitor overlay (same layered-window setup as the sidebar, where DWM thumbnails were
-        proven to render). The dim layer is translucent, so the desktop shows through dimmed; the
-        cards' live previews are DWM thumbnails positioned over the cards' thumbnail hosts.
+        Full-monitor overlay. Not a layered window: a "glass" window (GlassWindow) whose transparent
+        pixels DWM composites directly, so no screen-sized bitmaps are copied per frame or kept
+        afterwards. The dim layer is translucent, so the desktop shows through dimmed; the cards'
+        live previews are DWM thumbnails positioned over the cards' thumbnail hosts.
     -->
     <Grid x:Name="Root">
         <Rectangle x:Name="Dim" Fill="{DynamicResource ExposeDimBrush}" Opacity="0"

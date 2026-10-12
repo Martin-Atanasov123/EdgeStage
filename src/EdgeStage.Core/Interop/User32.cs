@@ -73,6 +73,9 @@ public static partial class User32
     public static partial nint GetAncestor(nint hWnd, uint gaFlags);
 
     [LibraryImport(Lib)]
+    public static partial nint WindowFromPoint(POINT point);
+
+    [LibraryImport(Lib)]
     public static partial nint GetLastActivePopup(nint hWnd);
 
     [LibraryImport(Lib)]

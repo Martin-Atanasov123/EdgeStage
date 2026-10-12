@@ -46,7 +46,7 @@ internal sealed class SettingsDocument
     internal sealed class ExposeSection
     {
         public string Hotkey { get; set; } = "";
-        public bool AllMonitors { get; set; }
+        public string Monitors { get; set; } = "";
         public string Density { get; set; } = "";
         public bool Grouping { get; set; }
         public bool ShowIcons { get; set; }
@@ -207,7 +207,7 @@ public sealed class SettingsStore
         Expose = new()
         {
             Hotkey = s.ExposeHotkey.ToString(),
-            AllMonitors = s.ExposeAllMonitors,
+            Monitors = s.ExposeMonitors.ToString(),
             Density = s.ExposeDensity.ToString(),
             Grouping = s.ExposeGrouping,
             ShowIcons = s.ExposeShowIcons,
@@ -259,7 +259,7 @@ public sealed class SettingsStore
             SidebarGrouping = (sidebar is { } sg ? Bool(sg, "grouping") : null) ?? d.SidebarGrouping,
 
             ExposeHotkey = ParseHotkey(Str(expose, "hotkey"), d.ExposeHotkey),
-            ExposeAllMonitors = Bool(expose, "allMonitors") ?? d.ExposeAllMonitors,
+            ExposeMonitors = ParseEnum(Str(expose, "monitors"), d.ExposeMonitors),
             ExposeDensity = ParseEnum(Str(expose, "density"), d.ExposeDensity),
             ExposeGrouping = Bool(expose, "grouping") ?? d.ExposeGrouping,
             ExposeShowIcons = Bool(expose, "showIcons") ?? d.ExposeShowIcons,

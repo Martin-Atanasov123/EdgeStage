@@ -11,14 +11,11 @@ $out   = Join-Path $root "artifacts\validation\e2e"
 New-Item -ItemType Directory -Force $out | Out-Null
 Remove-Item "$out\*" -ErrorAction SilentlyContinue
 
-# The user's own settings are restored afterwards (V2 rewrites a V1 file on load).
-$settings = Join-Path $env:APPDATA "EdgeStage\settings.json"
-$settingsBackup = Join-Path $out "settings.backup.json"
-if (Test-Path $settings) { Copy-Item $settings $settingsBackup -Force }
-$v1Backup = Join-Path $env:APPDATA "EdgeStage\settings.v1.json"
-$hadV1Backup = Test-Path $v1Backup
-
-Get-Process EdgeStage, ThumbnailSpike -ErrorAction SilentlyContinue | Stop-Process -Force
+# The user's own settings and running EdgeStage are put back afterwards.
+Backup-UserSettings
+Write-TestSettings
+$userCopies = Stop-UserEdgeStage $app
+Get-Process ThumbnailSpike -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 500
 
 $log = Join-Path $env:LOCALAPPDATA "EdgeStage\logs\edgestage-$(Get-Date -Format yyyyMMdd).log"
@@ -30,7 +27,8 @@ function Start-Source($mode, $title, $color) {
     $script:sources[$title] = $p
 }
 
-$backdrop = Start-Process $spike -ArgumentList '--backdrop', '0', '0', '360', '1032' -PassThru
+# The sidebar opens on the monitor under the pointer: every monitor gets a backdrop.
+$backdrops = @(Start-Backdrops $spike)
 Start-Sleep -Milliseconds 600
 Start-Source '--source'      'Quarterly report.xlsx'   '#3CB371'
 Start-Source '--source-flip' 'Live build output'        '#FF8C00'
@@ -91,9 +89,9 @@ $exited = $appProc.WaitForExit(5000)
 "EdgeStage exited cleanly: $exited (exit code $(if ($exited) { $appProc.ExitCode } else { 'n/a' }))"
 
 foreach ($p in $sources.Values) { if (-not $p.HasExited) { $p.Kill() } }
-if (-not $backdrop.HasExited) { $backdrop.Kill() }
-if (Test-Path $settingsBackup) { Copy-Item $settingsBackup $settings -Force; Remove-Item $settingsBackup }
-if (-not $hadV1Backup -and (Test-Path $v1Backup)) { Remove-Item $v1Backup }
+foreach ($b in $backdrops) { if (-not $b.HasExited) { $b.Kill() } }
+Restore-UserSettings
+Restart-UserEdgeStage $userCopies $root
 
 "--- capture notes ---"
 Get-ChildItem "$out\*.txt" | ForEach-Object { Get-Content $_ }

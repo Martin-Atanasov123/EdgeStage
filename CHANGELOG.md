@@ -10,6 +10,10 @@ All notable changes to EdgeStage. Versions follow [Semantic Versioning](https://
   `EdgeStage.exe --expose`). Previews fly out of the windows' real positions into the grid and back;
   the chosen window comes forward under the overlay. Arrow keys move spatially, Enter switches,
   Esc returns to the window you were using. Scrolls when there are too many windows.
+- **Exposé on every display**: with several monitors, Exposé appears on each of them at once, each
+  showing the windows on that display, so any window can be picked wherever it is; ← → continue onto
+  the neighboring display and search applies everywhere. Alternatives in Settings: only the display
+  under the pointer, or every window gathered on one display.
 - **Search in both views**: start typing; matches title and app name, ignoring case. Esc clears the
   search first. A count shows how many windows match.
 - **Group by app** (optional) in the sidebar and in Exposé, with collapsible group headers.
@@ -33,6 +37,13 @@ All notable changes to EdgeStage. Versions follow [Semantic Versioning](https://
 - Hover selects a card only after the pointer moves, so a list appearing under a resting pointer no
   longer changes the keyboard selection.
 - The sidebar has a header with the search box and an Exposé button.
+- The validation scripts cover every monitor with backdrops, keep the user's EdgeStage and settings,
+  and refuse to run while a full-screen app is in front.
+
+### Performance
+- Exposé's full-screen overlays are non-layered "glass" windows (no screen-sized bitmaps copied per
+  frame) and are released 15 s after Exposé closes: about 50 MB less while open and afterwards than
+  with layered windows, and animation at the display's refresh rate.
 
 ## [1.1.0] - 2026-10-11
 

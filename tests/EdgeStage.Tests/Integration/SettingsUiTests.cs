@@ -4,9 +4,11 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using EdgeStage.Core.Input;
+using EdgeStage.Core.Layout;
 using EdgeStage.Core.Settings;
 using EdgeStage.UI;
 using Microsoft.Win32;
+using ThemeMode = EdgeStage.Core.Settings.ThemeMode;
 
 namespace EdgeStage.Tests.Integration;
 
@@ -78,6 +80,12 @@ public sealed class SettingsUiTests
         timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
         timer.Start();
         Dispatcher.PushFrame(frame);
+    }
+
+    private static void CloseIfOpen(Window window)
+    {
+        if (window.IsVisible)
+            window.Close();
     }
 
     private static void Click(MenuItem item) => item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
@@ -254,6 +262,7 @@ public sealed class SettingsUiTests
         var window = OpenSettings(host);
         try
         {
+            window.ShowPage(SettingsPage.Sidebar); // the shortcut box lives on the Sidebar page
             window.Activate();
             Pump(50);
             if (!window.HotkeyBox.Focus())
@@ -276,6 +285,7 @@ public sealed class SettingsUiTests
     {
         var host = new FakeHost();
         var window = OpenSettings(host);
+        window.ShowPage(SettingsPage.Sidebar); // the shortcut box lives on the Sidebar page
         window.Activate();
         Pump(50);
         if (!window.HotkeyBox.Focus())
@@ -330,6 +340,135 @@ public sealed class SettingsUiTests
             Assert.IsTrue(host.Settings.HoldToSwitch, "the other toggle must be preserved");
         }
         finally { window.Close(); }
+    }
+
+    [STATestMethod]
+    public void Settings_Pages_ShowOneAtATime()
+    {
+        var window = OpenSettings(new FakeHost());
+        try
+        {
+            Assert.AreEqual(Visibility.Visible, window.PageAppearance.Visibility, "opens on Appearance");
+
+            window.ShowPage(SettingsPage.Expose);
+            Pump(30);
+
+            Assert.AreEqual(Visibility.Visible, window.PageExpose.Visibility);
+            Assert.AreEqual(Visibility.Collapsed, window.PageAppearance.Visibility);
+            Assert.AreEqual(Visibility.Collapsed, window.PageSidebar.Visibility);
+            Assert.AreEqual(true, window.NavExpose.IsChecked);
+        }
+        finally { CloseIfOpen(window); }
+    }
+
+    [STATestMethod]
+    public void Settings_ThemeAccentAndCustomColor_Apply()
+    {
+        var host = new FakeHost();
+        var window = OpenSettings(host);
+        try
+        {
+            window.ThemeLight.IsChecked = true;
+            Assert.AreEqual(ThemeMode.Light, host.Settings.Theme);
+
+            var green = window.AccentSwatches.Children.OfType<RadioButton>().Single(r => (r.Tag as string) == "Green");
+            green.IsChecked = true;
+            Assert.AreEqual("Green", host.Settings.Accent);
+
+            var custom = window.AccentSwatches.Children.OfType<RadioButton>().Last();
+            custom.IsChecked = true;
+            Assert.AreEqual(Visibility.Visible, window.CustomAccentRow.Visibility);
+            window.CustomAccent.Text = "#12";
+            StringAssert.Contains(window.CustomAccentHint.Text, "six hex digits");
+            Assert.AreEqual("Green", host.Settings.Accent, "an incomplete color is not applied");
+
+            window.CustomAccent.Text = "#123456";
+            window.Close(); // flushes the debounced change
+            Assert.AreEqual("#123456", host.Settings.Accent);
+        }
+        finally { CloseIfOpen(window); }
+    }
+
+    [STATestMethod]
+    public void Settings_LayoutPreset_AlsoMovesTheSpacingSlider()
+    {
+        var host = new FakeHost();
+        var window = OpenSettings(host);
+        try
+        {
+            window.LayoutCompact.IsChecked = true;
+
+            Assert.AreEqual(LayoutDensity.Compact, host.Settings.Layout);
+            Assert.AreEqual(CardMetrics.SpacingFor(LayoutDensity.Compact), host.Settings.CardSpacing);
+            Assert.AreEqual(CardMetrics.SpacingFor(LayoutDensity.Compact), window.CardSpacing.Value, 0.01);
+
+            window.SidebarWidth.Value = 320;
+            window.ExposeAllOnOne.IsChecked = true;
+            window.Close();
+            Assert.AreEqual(320, host.Settings.SidebarWidth);
+            Assert.AreEqual(ExposeMonitors.AllOnOneDisplay, host.Settings.ExposeMonitors);
+            Assert.AreEqual(LayoutDensity.Compact, host.Settings.Layout, "later changes keep the preset");
+        }
+        finally { CloseIfOpen(window); }
+    }
+
+    [STATestMethod]
+    public void Settings_ExposeShortcut_ShowsDuplicateAndConflictStates()
+    {
+        var host = new FakeHost { ExposeHotkeyStatus = new(HotkeyRegistrationStatus.Duplicate) };
+        var window = OpenSettings(host);
+        try
+        {
+            Assert.AreEqual("Ctrl+Alt+Up", window.ExposeHotkeyText.Text);
+            StringAssert.Contains(window.ExposeHotkeyStatus.Text, "same as the other");
+            Assert.AreEqual("Active.", window.HotkeyStatus.Text, "the sidebar shortcut is unaffected");
+        }
+        finally { CloseIfOpen(window); }
+
+        host = new FakeHost
+        {
+            ExposeHotkeyStatus = new(HotkeyRegistrationStatus.Conflict, 1409),
+            Suggestion = new Hotkey(HotkeyModifiers.Control | HotkeyModifiers.Alt, 0x28),
+        };
+        window = OpenSettings(host);
+        try
+        {
+            StringAssert.Contains(window.ExposeHotkeyStatus.Text, "Another app");
+            Assert.AreEqual("Use Ctrl+Alt+Down", window.ExposeSuggestButton.Content);
+            window.ExposeSuggestButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.AreEqual("Ctrl+Alt+Down", host.Settings.ExposeHotkey.ToString());
+            Assert.AreEqual("Ctrl+Alt+Space", host.Settings.Hotkey.ToString(), "never touches the sidebar shortcut");
+        }
+        finally { CloseIfOpen(window); }
+    }
+
+    [STATestMethod]
+    public void Settings_Reset_NeedsConfirmation_AndKeepsHiddenApps()
+    {
+        var host = new FakeHost
+        {
+            Settings = AppSettings.Default with { Theme = ThemeMode.Light, SidebarWidth = 350, ExcludedApps = ["steam"], FirstRunTipShown = true },
+        };
+        var window = OpenSettings(host);
+        try
+        {
+            window.ShowPage(SettingsPage.General);
+            window.ResetButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.AreEqual(Visibility.Visible, window.ResetConfirm.Visibility);
+            Assert.AreEqual(ThemeMode.Light, host.Settings.Theme, "nothing changes before confirming");
+
+            window.ResetNo.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.AreEqual(Visibility.Collapsed, window.ResetConfirm.Visibility);
+            Assert.AreEqual(350, host.Settings.SidebarWidth);
+
+            window.ResetButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            window.ResetYes.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+
+            Assert.AreEqual(AppSettings.Default with { ExcludedApps = ["steam"], FirstRunTipShown = true }, host.Settings);
+            Assert.AreEqual(true, window.ThemeDark.IsChecked, "controls show the reset values");
+            Assert.AreEqual(Visibility.Visible, window.ResetDone.Visibility);
+        }
+        finally { CloseIfOpen(window); }
     }
 
     // ---- start with Windows against the real registry (scratch key) ------------------------------------

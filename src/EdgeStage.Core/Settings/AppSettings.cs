@@ -4,6 +4,17 @@ using EdgeStage.Core.Layout;
 
 namespace EdgeStage.Core.Settings;
 
+/// <summary>Which displays Exposé appears on and which windows each shows.</summary>
+public enum ExposeMonitors
+{
+    /// <summary>On every display at once, each showing the windows on that display (like macOS).</summary>
+    EveryDisplay,
+    /// <summary>Only on the display under the pointer, with that display's windows.</summary>
+    ThisDisplay,
+    /// <summary>Only on the display under the pointer, with the windows of every display.</summary>
+    AllOnOneDisplay,
+}
+
 public enum ThemeMode
 {
     Dark,
@@ -66,8 +77,8 @@ public sealed record AppSettings
 
     public Hotkey ExposeHotkey { get; init; } = Hotkey.ExposeDefault;
 
-    /// <summary>Show the windows of every monitor (false: only the monitor Exposé opens on).</summary>
-    public bool ExposeAllMonitors { get; init; }
+    /// <summary>Exposé on every display (default), on this display only, or every window on one display.</summary>
+    public ExposeMonitors ExposeMonitors { get; init; } = ExposeMonitors.EveryDisplay;
 
     public ExposeDensity ExposeDensity { get; init; } = ExposeDensity.Auto;
 
@@ -160,6 +171,7 @@ public sealed record AppSettings
         Hotkey = Hotkey.IsValid ? Hotkey : Hotkey.Default,
         ExposeHotkey = ExposeHotkey.IsValid ? ExposeHotkey : Hotkey.ExposeDefault,
         ExposeDensity = Enum.IsDefined(ExposeDensity) ? ExposeDensity : ExposeDensity.Auto,
+        ExposeMonitors = Enum.IsDefined(ExposeMonitors) ? ExposeMonitors : ExposeMonitors.EveryDisplay,
         Theme = Enum.IsDefined(Theme) ? Theme : ThemeMode.Dark,
         Accent = Accents.Normalize(Accent),
         Layout = Enum.IsDefined(Layout) ? Layout : LayoutDensity.Balanced,

@@ -61,3 +61,37 @@ public static class GridNavigation
         return best;
     }
 }
+
+/// <summary>Which display an arrow key leads to when it leaves a display's grid.</summary>
+public static class DisplayNavigation
+{
+    /// <summary>Index of the nearest display in <paramref name="direction"/> from display <paramref name="from"/> (by centers), or -1.</summary>
+    public static int Neighbor(IReadOnlyList<CardBox> displays, int from, NavDirection direction)
+    {
+        if (from < 0 || from >= displays.Count)
+            return -1;
+        CardBox here = displays[from];
+        int best = -1;
+        double bestDistance = double.MaxValue;
+        for (int i = 0; i < displays.Count; i++)
+        {
+            if (i == from)
+                continue;
+            double dx = displays[i].CenterX - here.CenterX, dy = displays[i].CenterY - here.CenterY;
+            bool inDirection = direction switch
+            {
+                NavDirection.Left => dx < 0 && Math.Abs(dx) >= Math.Abs(dy),
+                NavDirection.Right => dx > 0 && Math.Abs(dx) >= Math.Abs(dy),
+                NavDirection.Up => dy < 0 && Math.Abs(dy) > Math.Abs(dx),
+                _ => dy > 0 && Math.Abs(dy) > Math.Abs(dx),
+            };
+            double distance = dx * dx + dy * dy;
+            if (inDirection && distance < bestDistance)
+            {
+                best = i;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+}

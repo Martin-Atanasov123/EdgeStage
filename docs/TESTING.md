@@ -7,58 +7,124 @@ report follows unchanged as the baseline.
 
 ## EdgeStage 2.0
 
-Environment as in 1.x below, except: a **second 1920×1080 monitor** (100 %) is now attached to the
-left of the primary one. Dates: 2026-10-11. Same rules: no synthesized input; screenshots only of
-EdgeStage over a full-screen opaque backdrop with synthetic windows (`EDGESTAGE_TEST_ONLY_PROCESS`);
-the scripts back up and restore the user's settings file and never print other windows' titles; they
-refuse to run while a full-screen app is in front (`tools/validation/guard.ps1`).
+Environment as in 1.x below, except: a **second 1920×1080 monitor** (100 %, 60 Hz) is attached to
+the left of the primary one, 4 px lower (`[-1920,4 1920x1080]`). Final runs: 2026-10-12.
 
-### Automated tests
+Rules for every run: no synthesized input; screenshots only of EdgeStage and synthetic windows over
+opaque backdrops covering **every** monitor (`EDGESTAGE_TEST_ONLY_PROCESS` limits the views to the
+synthetic windows); the scripts never print other windows' titles, back up and restore the user's
+settings file, ask the user's running EdgeStage to exit normally and restart it afterwards, run with
+the real edge trigger off (a pointer resting at a screen edge must not open the sidebar mid-check; the
+edge mode is exercised through a DEBUG hook), and refuse to start while a full-screen app is in front
+(`tools/validation/guard.ps1`). Twice the guard stopped the runs because a full-screen game was
+running; they were resumed only after the user closed it.
+
+### Automated tests — 256 PASS, 1 inconclusive (257 total)
+
+```bash
+dotnet test EdgeStage.slnx -c Release
+```
 
 | Run | Result |
 |---|---|
-| Unit tests (`--filter "TestCategory!=Desktop"`), Release, after Phase 4 | **219 passed**, 0 failed (includes 3 tray-menu tests that build the menu without showing it) |
-| Full suite incl. Desktop integration, Release, after Phase 2 | **242 passed**, 0 failed, 1 inconclusive (the same activation test as in 1.x) |
-| Full suite after Phases 3–4 | **NOT RUN yet** — a full-screen app was in front of the desktop from Phase 2 on, and the Desktop tests open windows and switch focus. Pending (see below). |
+| Full suite incl. Desktop integration, Release, final code | **256 passed**, 0 failed, 1 skipped/inconclusive (the activation test that needs foreground rights a test runner does not get — same as 1.x) |
+| Unit tests only (`--filter "TestCategory!=Desktop"`) | **219 passed**, 0 failed |
+| Debug and Release builds | 0 warnings, 0 errors |
 
-New unit tests in 2.0: Exposé grid layout 14 (+data rows) · grid arrow navigation 5 · grouping 7 ·
-settings schema 2 / migration 10 (+data rows; one uses the **real 1.x settings file** of the
-development machine as a fixture) · themes 5 (incl. "every brush used by the views exists in both
-themes") · reset to defaults · tray menu Exposé/hidden-apps entries.
+New in 2.0: Exposé grid layout 14 (+data rows) · grid arrow navigation 5 · display-to-display
+navigation 3 · grouping 7 · settings schema 2 / migration 10 (+data rows; one uses the **real 1.x
+settings file** of the development machine as a fixture) · themes 5 (incl. "every brush used by the
+views exists in both themes") · reset to defaults · tray menu Exposé/hidden-apps entries · settings
+window (Desktop): pages, theme/accent/custom color (invalid input not applied), layout preset moves the
+spacing slider, Exposé display mode, Exposé shortcut duplicate/conflict states and suggestion, Reset
+needs confirmation and keeps hidden apps.
 
-### Scripted end-to-end checks (Debug build, synthetic windows) — `tools/validation/e2e-expose.ps1`
+**Found and fixed during these runs:** the two shortcut-recorder tests had become inconclusive because
+the recorder now sits on the Sidebar page, which is hidden when the window opens; the tests now open
+that page first (they pass).
+
+### Scripted end-to-end checks (Debug build, synthetic windows)
+
+`tools/validation/e2e-expose.ps1` — Exposé, two monitors:
 
 | Check | Result |
 |---|---|
-| Exposé opens on the primary monitor with 5 windows, 5 live previews | **PASS** |
-| Fly-in: at the first frame every preview covers its real window exactly; previews fly into a centered grid; the minimized window fades in | **PASS** (frame captures) |
-| Animation smoothness (slowed ×3.3 for capture): 53–61 frames per 1000 ms open, 41–47 frames per 770–790 ms close | **PASS** (≈ 57–60 fps) |
-| Grid: 5 windows → 3 + 2 centered, 460 px cards; 6 windows → 3 × 2 | **PASS** |
-| Arrow navigation (Right, Down, Left, Up through the same code as the keys) | **PASS** |
+| **Ctrl+Alt+Up** is held by EdgeStage while it runs (another registration attempt fails) and free again after exit | **PASS** |
+| Exposé opens on **both** displays (default *Every display*): primary lists its 5 windows, the left display lists the window that is on it | **PASS** |
+| Fly-in from the real window positions into a centered grid; minimized window fades in | **PASS** (frame captures) |
+| Animation smoothness (slowed ×3.3 for capture): 123–149 frames per 1000 ms open, 70–108 frames per ≈ 775 ms close, both overlays animating together | **PASS** (renders at the display's refresh rate) |
+| Hit-testing at a card (Windows' own `WindowFromPoint`, on the overlays' thread) finds the overlay, not the full-screen corner mask, on both displays — clicks reach the cards | **PASS** |
+| Arrow navigation within a grid; ← at the edge of the primary grid continues on the left display, whose window is then chosen with Enter and becomes the foreground window | **PASS** |
 | A window opened / closed while Exposé is open appears / disappears | **PASS** |
-| Search "REPORT" → 1 of 5 matches (case-insensitive), counter shown; first Esc clears the search and Exposé stays open | **PASS** |
+| Search "REPORT" filters both displays (1 of 5 on the primary, "No matching windows" on the other); first Esc clears it and Exposé stays open; only the display with the keyboard keeps a selection | **PASS** |
 | Group by app → header row, grid below it | **PASS** |
-| Select a card → the chosen preview flies back on top, that window becomes the foreground window (a minimized one is restored) | **PASS** |
-| Esc → previews fly back and the previously active window is active again | **PASS** |
+| Select a card → that window becomes the foreground window; Esc → back to the window that was active before | **PASS** |
+| **Ctrl+W** on a window that refuses to close: after 3 s its card says "Still open — the app may be asking something" | **PASS** |
 | Exposé button in the sidebar's header → sidebar closes, Exposé opens | **PASS** |
 | Clean exit, 0 DWM registrations left | **PASS** |
-| Sidebar regression (`e2e-synthetic.ps1`) with the new header: open, live add/remove, activation, edge mode keeps focus, clean exit | **PASS** after Phase 1; a re-run after Phase 2 was disturbed by a full-screen app starting mid-run (not counted) |
-| Real 1.x settings file migrated on start (log), restored afterwards by the script | **PASS** |
-| Exposé shortcut Ctrl+Alt+Up registered at start; tray entries; Ctrl+W close follow-up; light theme and new settings window rendering | **NOT RUN yet** (pending, needs the desktop) |
-| Leak cycles for sidebar and Exposé (`leak-cycles.ps1`), resource measurements of Exposé (`measure-resources.ps1`) | **NOT RUN yet** (pending, needs the desktop) |
+
+`tools/validation/e2e-synthetic.ps1` — sidebar regression: open with live previews, window
+added/removed while open, activation of the selected card, edge-style open keeps the previous window
+in the foreground and closes when the pointer is elsewhere, settings window, tray menu (now with
+*Open Exposé  Ctrl+Alt+Up* and *Hidden apps…*), clean exit — **PASS**.
+
+`tools/validation/e2e-appearance.ps1` — **PASS** (reviewed captures): all five settings pages in the
+Light theme with the Purple accent and in the Dark theme with the Windows accent; sidebar and Exposé
+in the Light theme (light cards, purple selection ring); light title bar in Light. The settings window
+had first been captured *under* the topmost backdrops (test setup only); the DEBUG hook now puts it on
+top for captures.
+
+A real 1.x settings file was migrated on start (log), and restored by the scripts afterwards — **PASS**.
+
+### Leak cycles — `tools/validation/leak-cycles.ps1` (Debug build) — PASS
+
+100 sidebar open/close cycles, 50 Exposé open/close cycles (two overlays each), 30 windows opened and
+closed while hidden:
+
+| Stage | Handles | GDI | USER | Private MB | Threads |
+|---|---|---|---|---|---|
+| after warm-up | 690 | 100 | 62 | 157.2 | 23 |
+| after 100 sidebar cycles | 669 | 67 | 44 | 178.8 | 18 |
+| after 50 Exposé cycles | 674 | 100 | 62 | 170.6 | 18 |
+| after 30 windows opened + closed while hidden | 675 | 76 | 45 | 170.1 | 20 |
+| 20 s after the last use (idle overlays released) | **667** | **76** | **41** | **158.0** | 15 |
+
+Log: sidebar opened 104 / dismissed 104, Exposé 106 overlay opens (53 sessions), 0 errors, 0 DWM
+registrations at exit. GDI/USER alternate between two fixed levels (overlays alive vs. released).
+
+### Resource measurements — `tools/validation/measure-resources.ps1` (Release, self-contained)
+
+| State | CPU | Working set | Private | Handles / GDI / USER |
+|---|---|---|---|---|
+| Idle, hidden, edge polling on, 60 s | 78 ms = 0.13 % of one core | 98 MB | 64 MB | 652 / 53 / 30 |
+| Sidebar open and idle, 15 s | 63 ms = 0.42 % of one core | 136 MB | 93 MB | 703 / 59 / 49 |
+| Exposé open on both displays and idle, 15 s | 15 ms = 0.10 % of one core | 144 MB | 142 MB | 728 / 100 / 66 |
+| Hidden again, 20 s after Exposé closed | 63 ms | 131 MB | 131 MB | 705 / 76 / 44 |
+
+**Found and fixed during these measurements:** the first measurement kept **~120 MB** after Exposé
+closed (private 186 MB). Cause: full-screen *layered* (per-pixel transparent) windows — the overlays
+and their corner masks — have every frame copied into screen-sized system-memory bitmaps, and that
+memory stayed with the process. Exposé's overlays and masks are now non-layered "glass" windows
+(DWM composites WPF's transparent pixels directly), and idle overlays are destroyed 15 s after
+Exposé closes. Result: 142 MB while open (was 194), 131 MB afterwards (was 186). The remaining
+≈ 38 MB above "after the sidebar" is a one-time cost of the first Exposé use (not growing — see the
+leak cycles). As a side effect the overlays animate at the display's refresh rate.
+
+Single-run measurements; CPU figures of a few tens of ms vary between runs (one 60 s idle run read
+47 ms, another 188 ms).
 
 ### Release builds
 
-`dotnet publish` with both profiles (to `artifacts/v2/...`): self-contained **125.0 MB**,
-framework-dependent **0.66 MB**. Build: 0 warnings, 0 errors.
+`dotnet publish` with both profiles (to `artifacts/v2/...`): self-contained **125.1 MB**,
+framework-dependent **0.68 MB**.
 
 ### Manual checklist additions for 2.0 (needs a person)
 
-16. Press **Ctrl+Alt+Up** → Exposé opens on the monitor under the pointer, previews fly out of the windows; arrows move; Enter switches; Esc goes back; pressing Ctrl+Alt+Up again closes.
-17. In Exposé: click the dimmed background → closes; scroll with the wheel when there are many windows; hover a card and click its ×.
+16. Press **Ctrl+Alt+Up** → Exposé opens on every monitor, previews fly out of the windows; arrows move (← → cross to the other monitor); Enter switches; Esc goes back; pressing Ctrl+Alt+Up again closes.
+17. In Exposé: click a card (also on the other monitor) → that window comes forward; click the dimmed background → closes; scroll with the wheel when there are many windows; hover a card and click its ×.
 18. Type in Exposé and in the sidebar → search; Backspace edits; Esc clears, then closes.
 19. Settings › Appearance: switch Dark / Light / System, accents, a custom `#RRGGBB`, the layout presets and sliders → open sidebar and Exposé update live.
-20. Settings › Exposé: record a new shortcut; try one that equals the sidebar shortcut → refused with an explanation.
+20. Settings › Exposé: record a new shortcut; try one that equals the sidebar shortcut → refused with an explanation. Try *This display* and *All on one*.
 21. Settings › General › Reset… → Cancel does nothing; Reset restores defaults and keeps hidden apps.
 22. Turn on *Reduce motion* → sidebar fades without sliding; no zoom; Exposé fades instead of flying. Turn *Animations* off → views appear at once.
 
