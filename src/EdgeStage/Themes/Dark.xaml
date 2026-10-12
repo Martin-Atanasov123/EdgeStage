@@ -23,7 +23,7 @@
     <SolidColorBrush x:Key="CardBorderHoverBrush" Color="#B3FFFFFF" />
     <SolidColorBrush x:Key="CardBorderActiveBrush" Color="#8060CDFF" />
     <SolidColorBrush x:Key="FilterBarBrush" Color="#26FFFFFF" />
-    <SolidColorBrush x:Key="ExposeDimBrush" Color="#B30A0A0C" />
+    <SolidColorBrush x:Key="ExposeDimBrush" Color="#CC0A0A0C" />
     <SolidColorBrush x:Key="GroupHeaderBrush" Color="#14FFFFFF" />
     <SolidColorBrush x:Key="ThumbPlaceholderBrush" Color="#FF161618" />
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />

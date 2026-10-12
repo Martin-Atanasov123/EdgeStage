@@ -47,7 +47,12 @@ internal sealed class ZoomOverlay : Window
         User32.SetWindowLongPtr(_hwnd, GWL_EXSTYLE, (nint)(ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT));
     }
 
-    /// <summary>Screen rectangle (device px) the window occupies, or where it will be restored to.</summary>
+    /// <summary>
+    /// Screen rectangle (device px) of the window's visible frame, or where it will be restored to.
+    /// DWM's extended frame bounds, not GetWindowRect: on Windows 10/11 the window rectangle also covers
+    /// invisible resize borders (≈ 7 px left, right and bottom), while a DWM preview shows just the
+    /// visible frame — matching the two makes a preview land exactly on its window.
+    /// </summary>
     public static RECT TargetRect(nint hwnd)
     {
         if (User32.IsIconic(hwnd))
@@ -66,6 +71,9 @@ internal sealed class ZoomOverlay : Window
                 return placement.rcNormalPosition;
             }
         }
+        if (Dwmapi.DwmGetWindowAttributeRect(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT visible,
+                System.Runtime.InteropServices.Marshal.SizeOf<RECT>()) >= 0 && !visible.IsEmpty)
+            return visible;
         return User32.GetWindowRect(hwnd, out RECT r) ? r : default;
     }
 

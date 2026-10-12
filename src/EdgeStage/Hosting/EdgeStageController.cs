@@ -570,6 +570,10 @@ internal sealed class EdgeStageController : IDisposable, ITrayActions, ISettings
             case SingleInstance.TestCommand.ExposeHitTest: Log.Info("Exposé hit test at the selected card: " + _expose.HitTestSelectedForTest()); break;
             case SingleInstance.TestCommand.ExposeSelectStubborn: _expose.SelectTitleForTest("Stubborn window"); break;
             case SingleInstance.TestCommand.ExposeSelectOtherDisplay: _expose.SelectTitleForTest("Second display window"); break;
+            case SingleInstance.TestCommand.ExposeSelectDesign: _expose.SelectTitleForTest("Design notes"); break;
+            case SingleInstance.TestCommand.ExposeSelectMaximized: _expose.SelectTitleForTest("Maximized window"); break;
+            case SingleInstance.TestCommand.ExposeSelectMusic: _expose.SelectTitleForTest("Music player"); break;
+            case SingleInstance.TestCommand.ExposeSelectMinMax: _expose.SelectTitleForTest("Minimized maximized"); break;
             case SingleInstance.TestCommand.SettingsAppearance: OpenSettingsForTest(SettingsPage.Appearance); break;
             case SingleInstance.TestCommand.SettingsSidebar: OpenSettingsForTest(SettingsPage.Sidebar); break;
             case SingleInstance.TestCommand.SettingsExpose: OpenSettingsForTest(SettingsPage.Expose); break;

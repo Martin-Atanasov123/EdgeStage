@@ -57,6 +57,10 @@ internal static class SingleInstance
         SettingsHiddenApps,
         SettingsClose,
         ExposeHitTest,
+        ExposeSelectDesign,
+        ExposeSelectMaximized,
+        ExposeSelectMusic,
+        ExposeSelectMinMax,
     }
 #endif
 

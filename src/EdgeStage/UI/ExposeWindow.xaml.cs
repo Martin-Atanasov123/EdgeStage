@@ -69,7 +69,8 @@ internal interface IExposeHost
 internal partial class ExposeWindow : Window
 {
     private const double OpenDurationMs = 300;
-    private const double CloseDurationMs = 230;
+    /// <summary>Selection / Esc: previews fly back to their windows (ease-in-out, no overshoot).</summary>
+    private const double CloseDurationMs = 280;
     private const double FadeDurationMs = 140;
     private const double HeaderHeight = 34;
 
@@ -101,8 +102,19 @@ internal partial class ExposeWindow : Window
     private int _frames;
     private bool _closing;
 
-    /// <summary>Uniform scale + offset that maps a card's preview onto its window (DIPs, container coordinates).</summary>
-    private sealed record Flight(FrameworkElement Container, double Scale, Vector Offset, bool Flies);
+    /// <summary>
+    /// Uniform scale + offset that maps a card's preview onto its window (DIPs, container coordinates).
+    /// <paramref name="Follow"/>: the chosen window while closing; its real bounds are re-read every
+    /// frame, so the preview lands exactly where the window is (also after a restore or a move).
+    /// </summary>
+    private sealed record Flight(FrameworkElement Container, double Scale, Vector Offset, bool Flies,
+        Rect Slot = default, Rect PreviewDip = default, nint Follow = 0)
+    {
+        public double Scale { get; set; } = Scale;
+        public Vector Offset { get; set; } = Offset;
+    }
+
+    private Action? _landed;
 
     public ExposeWindow(WindowTracker tracker, IExposeHost host)
     {
@@ -294,10 +306,16 @@ internal partial class ExposeWindow : Window
     /// Starts closing (called by the session for every overlay). Hooks and timers stop at once;
     /// the previews fly back, <paramref name="target"/> (the chosen window) on top.
     /// </summary>
-    internal void BeginClose(string reason, bool immediate, CardViewModel? target)
+    /// <param name="landed">Runs when the previews have landed, right before the overlay disappears
+    /// (the session activates the chosen window there, so it comes forward in the same frame).</param>
+    internal void BeginClose(string reason, bool immediate, CardViewModel? target, Action? landed = null)
     {
         if (!IsOpen)
+        {
+            landed?.Invoke();
             return;
+        }
+        _landed = landed;
         IsOpen = false;
         _closing = true;
         _sourceSizeTimer.Stop();
@@ -318,7 +336,12 @@ internal partial class ExposeWindow : Window
 
     private void FinishClose()
     {
+        LogLanding();
         StopAnimation();
+        // Activation first, then the overlay goes: the real window takes the preview's place in one frame.
+        Action? landed = _landed;
+        _landed = null;
+        landed?.Invoke();
         _closing = false;
         _thumbs.ReleaseAll();
         ResetTransforms();
@@ -401,23 +424,17 @@ internal partial class ExposeWindow : Window
             Vector offset = default;
             Rect slot = container.TransformToAncestor(this).TransformBounds(new Rect(0, 0, container.ActualWidth, container.ActualHeight));
             bool closingTarget = !opening && card == target;
+            Rect previewDip = default;
+            // The chosen window is revalidated now: closed → fade; minimized → its restored bounds.
             if (motion && (!card.IsMinimized || closingTarget) && slot.IntersectsWith(viewport)
-                && _thumbs.GetCardPreview(card) is { } preview)
+                && User32.IsWindow(card.Hwnd) && _thumbs.GetCardPreview(card) is { } preview && preview.Rect.Width > 0)
             {
-                RECT real = ZoomOverlay.TargetRect(card.Hwnd);
-                bool onThisMonitor = real.Right > bounds.Left && real.Left < bounds.Right && real.Bottom > bounds.Top && real.Top < bounds.Bottom;
-                if (!real.IsEmpty && (onThisMonitor || closingTarget) && preview.Rect.Width > 0)
-                {
-                    // Preview and window share an aspect ratio, so one scale maps one onto the other.
-                    var previewDip = new Rect(preview.Rect.X / scale, preview.Rect.Y / scale, preview.Rect.Width / scale, preview.Rect.Height / scale);
-                    var realDip = new Rect((real.Left - bounds.Left) / scale, (real.Top - bounds.Top) / scale, real.Width / scale, real.Height / scale);
-                    s = realDip.Width / previewDip.Width;
-                    Point q0 = new(previewDip.X - slot.X, previewDip.Y - slot.Y);
-                    offset = new Vector(realDip.X - slot.X - s * q0.X, realDip.Y - slot.Y - s * q0.Y);
-                    flies = true;
-                }
+                previewDip = new Rect(preview.Rect.X / scale, preview.Rect.Y / scale, preview.Rect.Width / scale, preview.Rect.Height / scale);
+                // Windows on another display fade (a flight would be cut off at this overlay's edge).
+                if (MapOnto(ZoomOverlay.TargetRect(card.Hwnd), previewDip, slot) is { } map)
+                    (s, offset, flies) = (map.Scale, map.Offset, true);
             }
-            _flights[card] = new Flight(container, s, offset, flies);
+            _flights[card] = new Flight(container, s, offset, flies, slot, previewDip, closingTarget && flies ? card.Hwnd : 0);
             container.RenderTransform = new MatrixTransform(Matrix.Identity);
         }
 
@@ -437,17 +454,54 @@ internal partial class ExposeWindow : Window
         ApplyFrame(opening ? 0 : 1);
     }
 
+    /// <summary>
+    /// Scale + offset that put the preview (<paramref name="previewDip"/>, inside the card at
+    /// <paramref name="slot"/>) exactly onto the window rectangle <paramref name="real"/> (screen device
+    /// px), or null when the rectangle is unusable or not on this overlay's display. Preview and window
+    /// share an aspect ratio, so one uniform scale maps one onto the other.
+    /// </summary>
+    private (double Scale, Vector Offset)? MapOnto(RECT real, Rect previewDip, Rect slot)
+    {
+        if (_monitor is null || real.IsEmpty || previewDip.Width <= 0)
+            return null;
+        RECT b = _monitor.Bounds;
+        bool onThisMonitor = real.Right > b.Left && real.Left < b.Right && real.Bottom > b.Top && real.Top < b.Bottom;
+        if (!onThisMonitor)
+            return null;
+        double scale = _monitor.Scale;
+        var realDip = new CardBox((real.Left - b.Left) / scale, (real.Top - b.Top) / scale, real.Width / scale, real.Height / scale);
+        return FlightMath.MapOnto(new CardBox(previewDip.X, previewDip.Y, previewDip.Width, previewDip.Height),
+                new CardBox(slot.X, slot.Y, slot.Width, slot.Height), realDip) is { } m
+            ? (m.Scale, new Vector(m.OffsetX, m.OffsetY))
+            : null;
+    }
+
+    /// <summary>How far the chosen preview landed from its real window (device px) — the precision of the hand-over.</summary>
+    private void LogLanding()
+    {
+        Flight? follow = _flights.Values.FirstOrDefault(f => f.Follow != 0);
+        if (follow is null || _monitor is null || _opening)
+            return;
+        CardViewModel card = _flights.First(kv => kv.Value == follow).Key;
+        if (_thumbs.GetCardPreview(card) is not { } landed)
+            return;
+        RECT real = ZoomOverlay.TargetRect(follow.Follow); // the window's visible frame
+        double x = landed.Rect.X + _monitor.Bounds.Left, y = landed.Rect.Y + _monitor.Bounds.Top;
+        double error = new[]
+        {
+            Math.Abs(x - real.Left), Math.Abs(y - real.Top),
+            Math.Abs(x + landed.Rect.Width - real.Right), Math.Abs(y + landed.Rect.Height - real.Bottom),
+        }.Max();
+        Log.Info($"Exposé landing: preview [{x:F0},{y:F0} {landed.Rect.Width:F0}x{landed.Rect.Height:F0}] " +
+                 $"window frame [{real.Left},{real.Top} {real.Width}x{real.Height}], max edge error {error:F1} px.");
+    }
+
     private void OnAnimationFrame(object? sender, EventArgs e)
     {
         double elapsed = _clock.Elapsed.TotalMilliseconds;
         double t = Math.Clamp(elapsed / _durationMs, 0, 1);
         _frames++;
-        // Opening: ease-out quart (quick start, soft landing in the grid). Closing: ease-in-out cubic,
-        // so previews settle onto the real windows without a visible jolt.
-        double p = _opening
-            ? 1 - Math.Pow(1 - t, 4)
-            : 1 - (t < 0.5 ? 4 * t * t * t : 1 - Math.Pow(-2 * t + 2, 3) / 2);
-        ApplyFrame(_opening ? p : 1 - p);
+        ApplyFrame(Progress(_opening, t));
         if (t < 1)
             return;
 
@@ -472,19 +526,54 @@ internal partial class ExposeWindow : Window
     /// <summary><paramref name="progress"/>: 0 = previews over the real windows, 1 = settled in the grid.</summary>
     private double _progress;
 
+    /// <summary>
+    /// Animation progress for time fraction <paramref name="t"/> (0 → 1): 0 = previews over the real
+    /// windows, 1 = settled in the grid. Opening rises with ease-out quart (quick start, soft landing in
+    /// the grid); closing falls with ease-in-out cubic, so previews leave the grid gently and settle
+    /// onto the real windows without a jolt. No overshoot either way.
+    /// </summary>
+    internal static double Progress(bool opening, double t)
+    {
+        t = Math.Clamp(t, 0, 1);
+        if (opening)
+            return 1 - Math.Pow(1 - t, 4);
+        double eased = t < 0.5 ? 4 * t * t * t : 1 - Math.Pow(-2 * t + 2, 3) / 2;
+        return 1 - eased;
+    }
+
     private void ApplyFrame(double progress)
     {
         _progress = progress;
-        Dim.Opacity = progress;
-        SearchBox.Opacity = progress;
+        // The dim stays at full strength until the previews are well on their way and fades as they
+        // land, so the real windows beneath are revealed only where their previews arrive (no visible
+        // second copy of a window while its preview is still travelling).
+        double cover = Math.Clamp(progress / 0.2, 0, 1);
+        Dim.Opacity = cover;
+        SearchBox.Opacity = cover;
         foreach (Flight flight in _flights.Values)
         {
-            double s = flight.Scale + (1 - flight.Scale) * progress;
-            Vector o = flight.Offset * (1 - progress);
-            ((MatrixTransform)flight.Container.RenderTransform).Matrix = new Matrix(s, 0, 0, s, o.X, o.Y);
+            // The chosen window: follow its real bounds (restored, maximized, moved) every frame.
+            if (flight.Follow != 0 && MapOnto(ZoomOverlay.TargetRect(flight.Follow), flight.PreviewDip, flight.Slot) is { } map)
+                (flight.Scale, flight.Offset) = (map.Scale, map.Offset);
+
+            Matrix m;
+            if (flight.Flies)
+            {
+                double s = flight.Scale + (1 - flight.Scale) * progress;
+                Vector o = flight.Offset * (1 - progress);
+                m = new Matrix(s, 0, 0, s, o.X, o.Y);
+            }
+            else
+            {
+                // Fade-and-scale (no reliable window bounds): shrink slightly about the card's center.
+                double k = 0.9 + 0.1 * progress;
+                double cx = flight.Container.ActualWidth / 2, cy = flight.Container.ActualHeight / 2;
+                m = new Matrix(k, 0, 0, k, cx * (1 - k), cy * (1 - k));
+            }
+            ((MatrixTransform)flight.Container.RenderTransform).Matrix = m;
             // The card's own chrome (frame, title) appears as it lands; the live preview is visible throughout.
             // Flying cards show their frame and title only near the grid, so no oversized "ghost" frame trails the preview.
-            flight.Container.Opacity = flight.Flies ? Math.Clamp((progress - 0.4) / 0.6, 0, 1) : progress;
+            flight.Container.Opacity = flight.Flies ? Math.Clamp((progress - 0.75) / 0.25, 0, 1) : progress;
         }
         _thumbs.Update();
     }

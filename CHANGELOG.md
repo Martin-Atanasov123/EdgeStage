@@ -40,6 +40,17 @@ All notable changes to EdgeStage. Versions follow [Semantic Versioning](https://
 - The validation scripts cover every monitor with backdrops, keep the user's EdgeStage and settings,
   and refuse to run while a full-screen app is in front.
 
+- Choosing a window in Exposé: its preview flies onto the window's exact visible bounds (normal,
+  maximized, restored from minimized, other monitor), the other previews return to their windows, and
+  the window is activated as its preview lands, in the same step as the overlay disappears. Esc
+  returns the same way. 280 ms ease-in-out; windows without reliable bounds fade and scale instead.
+
+### Fixed
+- The Exposé close animation ran backwards (previews jumped to the windows, then drifted back into
+  the grid).
+- Previews targeted the window rectangle including Windows' invisible resize borders and landed a few
+  pixels off; they now use the visible frame (also for the opening flight and the sidebar's zoom).
+
 ### Performance
 - Exposé's full-screen overlays are non-layered "glass" windows (no screen-sized bitmaps copied per
   frame) and are released 15 s after Exposé closes: about 50 MB less while open and afterwards than

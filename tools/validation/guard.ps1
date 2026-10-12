@@ -13,7 +13,8 @@ public struct RECT { public int Left, Top, Right, Bottom; }
 
 # Titles of the synthetic windows these scripts create; anything else is reported anonymously.
 $script:SyntheticTitles = @('Quarterly report.xlsx', 'Live build output', 'Inbox - Mail', 'Music player',
-    'Design notes', 'Newly opened window', 'Second display window', 'Stubborn window')
+    'Design notes', 'Newly opened window', 'Second display window', 'Stubborn window', 'Maximized window',
+    'Minimized maximized')
 
 function Get-SafeTitle([System.IntPtr]$hwnd) {
     $sb = New-Object System.Text.StringBuilder 256
@@ -40,6 +41,15 @@ function Start-Backdrops([string]$spike) {
     foreach ($s in [System.Windows.Forms.Screen]::AllScreens) {
         $b = $s.Bounds
         Start-Process $spike -ArgumentList '--backdrop', $b.X, $b.Y, $b.Width, $b.Height -PassThru
+    }
+}
+
+# Non-topmost backdrops (for checks where test windows must be visible above the backdrop).
+function Start-LowBackdrops([string]$spike) {
+    foreach ($s in [System.Windows.Forms.Screen]::AllScreens) {
+        $b = $s.Bounds
+        Start-Process $spike -ArgumentList '--backdrop-low', $b.X, $b.Y, $b.Width, $b.Height -PassThru
+        Start-Sleep -Milliseconds 400
     }
 }
 

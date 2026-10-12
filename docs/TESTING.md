@@ -19,7 +19,7 @@ edge mode is exercised through a DEBUG hook), and refuse to start while a full-s
 (`tools/validation/guard.ps1`). Twice the guard stopped the runs because a full-screen game was
 running; they were resumed only after the user closed it.
 
-### Automated tests — 256 PASS, 1 inconclusive (257 total)
+### Automated tests — 265 PASS, 1 inconclusive (266 total)
 
 ```bash
 dotnet test EdgeStage.slnx -c Release
@@ -27,12 +27,13 @@ dotnet test EdgeStage.slnx -c Release
 
 | Run | Result |
 |---|---|
-| Full suite incl. Desktop integration, Release, final code | **256 passed**, 0 failed, 1 skipped/inconclusive (the activation test that needs foreground rights a test runner does not get — same as 1.x) |
-| Unit tests only (`--filter "TestCategory!=Desktop"`) | **219 passed**, 0 failed |
+| Full suite incl. Desktop integration, Release, final code | **265 passed**, 0 failed, 1 skipped/inconclusive (the activation test that needs foreground rights a test runner does not get — same as 1.x) |
+| Unit tests only (`--filter "TestCategory!=Desktop"`) | **228 passed**, 0 failed |
 | Debug and Release builds | 0 warnings, 0 errors |
 
 New in 2.0: Exposé grid layout 14 (+data rows) · grid arrow navigation 5 · display-to-display
-navigation 3 · grouping 7 · settings schema 2 / migration 10 (+data rows; one uses the **real 1.x
+navigation 3 · flight mapping (preview lands exactly on the window) 4 · animation progress direction
+and easing 5 · grouping 7 · settings schema 2 / migration 10 (+data rows; one uses the **real 1.x
 settings file** of the development machine as a fixture) · themes 5 (incl. "every brush used by the
 views exists in both themes") · reset to defaults · tray menu Exposé/hidden-apps entries · settings
 window (Desktop): pages, theme/accent/custom color (invalid input not applied), layout preset moves the
@@ -75,6 +76,48 @@ had first been captured *under* the topmost backdrops (test setup only); the DEB
 top for captures.
 
 A real 1.x settings file was migrated on start (log), and restored by the scripts afterwards — **PASS**.
+
+### Selection transition — `tools/validation/e2e-select.ps1` (Debug, synthetic windows) — PASS
+
+The chosen preview flies from the grid onto its window (280 ms, ease-in-out cubic, no overshoot),
+the other previews fly back to their windows, and the dim fades as they land; the chosen window is
+activated at the landing and the overlay disappears in the same step. These backdrops are *not*
+topmost, so the synthetic windows are visible above them and the captures show the hand-over.
+Selection goes through the same code as Enter and a click (`ActivateCard`).
+
+| Case | Foreground afterwards | State afterwards | Landing error (preview vs. the window's visible frame) |
+|---|---|---|---|
+| Normal window | the chosen window | normal | **0.0 px** |
+| Maximized window | the chosen window | maximized | **0.0 px** (lands on the work area, 1920×1032) |
+| Minimized window | the chosen window | restored | **0.0 px** |
+| Minimized while maximized | the chosen window | maximized again | **0.0 px** |
+| Window on the other monitor | the chosen window | normal | **0.0 px** |
+| Esc | the window active before Exposé | — | previews fly back to their windows |
+
+**Found and fixed during these runs:**
+- The closing progress was inverted twice since Phase 1, so the close animation actually ran
+  backwards (previews jumped onto the windows, then drifted back into the grid while the dim faded
+  back in, then vanished). The new landing log exposed it (errors of 310–1490 px); fixed and pinned
+  by unit tests (`ExposeProgressTests`).
+- Windows were targeted with `GetWindowRect`, which on Windows 10/11 includes ≈ 7 px invisible resize
+  borders; a DWM preview shows only the visible frame, so previews landed a few pixels off and
+  maximized windows ≈ 4–8 px off. Targets are now DWM's extended frame bounds (also used by the
+  opening flight and the sidebar's zoom). Landing error: 0.0 px in every case.
+- Mid-flight captures showed faint oversized card frames trailing the previews and real windows
+  appearing through the fading dim before their previews arrived. Card frames now show only near the
+  grid, the dim (now 80 % instead of 70 %) stays until the previews are within 20 % of their windows,
+  and the real chosen window is brought forward only at the landing.
+
+**Limits imposed by Windows/DWM (observed, not fixable from EdgeStage):**
+- A DWM thumbnail cannot be clipped to a rounded shape; the corner masks that round the previews in
+  the grid only work over the card's own background. In flight, previews have square corners; at the
+  hand-over the real window's rounded corners and its shadow appear (one frame change).
+- The dim is translucent, so while Exposé is open the real windows remain faintly visible beneath it
+  (EdgeStage cannot hide other apps' windows). They are fully revealed only as previews land.
+- A minimized window is restored at the start of the transition (so it has real bounds to land on);
+  Windows plays its own restore animation underneath the dim during the flight.
+- Captures are taken ≈ every 120 ms in slow motion, so single-frame effects at the hand-over are not
+  observable by these scripts; the 0.0 px landing error is measured, the visual hand-over is not.
 
 ### Leak cycles — `tools/validation/leak-cycles.ps1` (Debug build) — PASS
 

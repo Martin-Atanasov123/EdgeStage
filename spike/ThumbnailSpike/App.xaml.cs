@@ -20,7 +20,8 @@ public partial class App : Application
 
         try
         {
-            if (args.Length >= 3 && args[0] is "--source" or "--source-flip" or "--source-min" or "--source-retitle" or "--source-stubborn")
+            if (args.Length >= 3 && args[0] is "--source" or "--source-flip" or "--source-min" or "--source-retitle" or "--source-stubborn"
+                    or "--source-max" or "--source-minmax")
             {
                 var color = (Color)ColorConverter.ConvertFromString(args[2]);
                 // Optional placement: <x> <y> <width> <height> after the color.
@@ -51,6 +52,17 @@ public partial class App : Application
                     int step = 0;
                     timer.Tick += (_, _) => window.Title = $"{args[1]} — step {++step} — " + new string('x', 20 * (step % 4));
                     timer.Start();
+                }
+                else if (args[0] == "--source-max")
+                {
+                    window.WindowState = WindowState.Maximized;
+                }
+                else if (args[0] == "--source-minmax")
+                {
+                    // Maximized, then minimized: restoring it must bring it back maximized.
+                    window.WindowState = WindowState.Maximized;
+                    await Task.Delay(800);
+                    window.WindowState = WindowState.Minimized;
                 }
                 else if (args[0] == "--source-stubborn")
                 {
@@ -85,7 +97,7 @@ public partial class App : Application
                 return;
             }
 
-            if (args.Length >= 5 && args[0] == "--backdrop")
+            if (args.Length >= 5 && args[0] is "--backdrop" or "--backdrop-low")
             {
                 // --backdrop <left> <top> <width> <height>: opaque neutral surface so screenshots of
                 // the translucent sidebar show nothing of the user's own windows behind it.
@@ -94,7 +106,8 @@ public partial class App : Application
                     WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false,
                     Left = double.Parse(args[1]), Top = double.Parse(args[2]), Width = double.Parse(args[3]), Height = double.Parse(args[4]),
                     Background = new LinearGradientBrush(Color.FromRgb(0x3A, 0x4A, 0x6A), Color.FromRgb(0x6A, 0x4A, 0x5A), 45),
-                    Title = "EdgeStage Spike Backdrop", ShowActivated = false, Topmost = true,
+                    // --backdrop-low: not topmost, so test windows started later stay above it.
+                    Title = "EdgeStage Spike Backdrop", ShowActivated = args[0] == "--backdrop-low", Topmost = args[0] == "--backdrop",
                 };
                 // Tool window: never listed by EdgeStage (or Alt+Tab).
                 backdrop.SourceInitialized += (_, _) =>

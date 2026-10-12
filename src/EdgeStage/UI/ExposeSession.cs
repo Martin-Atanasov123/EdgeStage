@@ -172,14 +172,16 @@ internal sealed class ExposeSession : IExposeHost
         nint previous = _previous;
         bool canReturn = returnToPrevious && previous != 0 && User32.IsWindow(previous)
                          && _pool.All(o => o.Handle != previous);
-        // Every overlay enters its closing state first: activating another window deactivates them synchronously.
-        foreach (ExposeWindow overlay in _open)
-            overlay.BeginClose(reason, immediate, overlay.Selected == target ? target : null);
+        // The previews fly back; the previous window is activated when they land, right before the
+        // overlays disappear (this process keeps the foreground until then), so the desktop is revealed
+        // in its old state in one step instead of the window jumping to the front under the dim.
+        ExposeWindow? lead = _open.FirstOrDefault(o => o.IsActive) ?? _open.LastOrDefault(o => o.IsOpen);
         Log.Info($"Exposé dismissed: {reason}.");
         Dismissed?.Invoke(reason);
         _releaseTimer.Start();
-        if (canReturn)
-            _ = ReturnToPreviousAsync(previous); // while this process still holds the foreground
+        foreach (ExposeWindow overlay in _open)
+            overlay.BeginClose(reason, immediate, target: null,
+                landed: canReturn && overlay == lead ? () => _ = ReturnToPreviousAsync(previous) : null);
     }
 
     private static async Task ReturnToPreviousAsync(nint previous)
@@ -199,14 +201,36 @@ internal sealed class ExposeSession : IExposeHost
         if (_closing)
             return;
         _closing = true;
-        foreach (ExposeWindow overlay in _open)
-            overlay.BeginClose("window selected", immediate: false, overlay == from ? card : null);
         Log.Info("Exposé dismissed: window selected.");
         Dismissed?.Invoke("window selected");
         _releaseTimer.Start();
+
+        // Revalidate the chosen window right before the transition.
+        if (!User32.IsWindow(card.Hwnd))
+        {
+            Log.Info($"Chosen window 0x{card.Hwnd:X} closed meanwhile; Exposé fades out.");
+            foreach (ExposeWindow overlay in _open)
+                overlay.BeginClose("chosen window closed", immediate: false, target: null);
+            return;
+        }
+        // A minimized window is restored now, so its real bounds exist for the preview to land on.
+        // Its own restore animation plays underneath the overlay while the preview flies.
+        if (User32.IsIconic(card.Hwnd))
+            User32.ShowWindow(card.Hwnd, SW_RESTORE);
+
+        // Everything else is activated at the landing, right before the overlay disappears: until then
+        // this process keeps the foreground (so Windows allows the switch), and the real window comes
+        // forward exactly when its preview has reached it — no jump to the front under the dim.
+        var activation = new TaskCompletionSource<ActivationResult>();
+        foreach (ExposeWindow overlay in _open)
+            overlay.BeginClose("window selected", immediate: false, overlay == from ? card : null,
+                landed: overlay == from ? () => StartActivation(card, activation) : null);
+        if (!from.IsVisible)
+            StartActivation(card, activation); // safety net: the overlay was not on screen to land
+
         try
         {
-            ActivationResult result = await WindowActivator.ActivateAsync(card.Hwnd);
+            ActivationResult result = await activation.Task;
             if (result.Outcome == ActivationOutcome.Refused)
             {
                 Log.Warn($"Activation refused for 0x{card.Hwnd:X} ({card.ProcessName}): {result.Detail}");
@@ -216,6 +240,22 @@ internal sealed class ExposeSession : IExposeHost
         catch (Exception ex)
         {
             Log.Error($"Activation of 0x{card.Hwnd:X} failed", ex);
+        }
+    }
+
+    /// <summary>Starts the activation once (its first, synchronous step brings the window forward).</summary>
+    private static async void StartActivation(CardViewModel card, TaskCompletionSource<ActivationResult> done)
+    {
+        if (done.Task.IsCompleted)
+            return;
+        try
+        {
+            Task<ActivationResult> task = WindowActivator.ActivateAsync(card.Hwnd);
+            done.TrySetResult(await task);
+        }
+        catch (Exception ex)
+        {
+            done.TrySetException(ex);
         }
     }
 

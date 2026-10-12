@@ -209,7 +209,8 @@ Key decisions (evidence in [docs/spike-findings.md](docs/spike-findings.md)):
 - 🧊 **Minimized windows** show the last frame Windows kept before minimizing (labelled "Minimized"); it is not live. If Windows has no frame, the app icon is shown instead.
 - ⬛ **Protected content** (DRM video, some secure apps) appears black, by design of Windows.
 - 🗂️ Windows on **other virtual desktops** are not listed (Windows hides them from previews).
-- 🔲 The preview that grows during the zoom animation, and previews while Exposé's cards fly, have square corners.
+- 🔲 The preview that grows during the zoom animation, and previews while Exposé's cards fly, have square corners (DWM thumbnails cannot be clipped to a rounded shape); the real window's rounded corners and shadow appear when it takes over.
+- 🌫️ Exposé's dim is translucent: the real windows stay faintly visible beneath it until the previews land on them.
 
 **Window activation**
 - Windows controls who may take the foreground. Switching works in response to the shortcut, a click, or the tray; if Windows still refuses, you get a notification.
